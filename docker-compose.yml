@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  qba-bms-fe:
+    image: qba-bms-fe:1.0.0
+    container_name: qba-bms-fe
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
