@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Button, Image, Input, notification } from 'antd';
 import { UploadOutlined, PictureOutlined, DeleteOutlined, LinkOutlined, LoadingOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { resolveUrl } from '../utils/resolveUrl';
 import { attachmentsApi } from '../api/modulesApi';
 
-const ImageUploadInput = ({ value, onChange, placeholder = 'Nhập link ảnh hoặc chọn từ máy...', resModel = 'general', resId = '0' }) => {
+const ImageUploadInput = ({ value, onChange, placeholder, resModel = 'general', resId = '0' }) => {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState(value || '');
   const [uploading, setUploading] = useState(false);
 
@@ -27,8 +29,8 @@ const ImageUploadInput = ({ value, onChange, placeholder = 'Nhập link ảnh ho
       setInputValue(relativeUrl);
       if (onChange) onChange(relativeUrl);
       notification.success({
-        message: 'Đã tải ảnh lên Server Backend',
-        description: `Đường dẫn tương đối: ${relativeUrl}`,
+        message: t('common.success'),
+        description: relativeUrl,
       });
     } catch (err) {
       console.warn('Backend attachment upload fallback:', err);
@@ -37,7 +39,7 @@ const ImageUploadInput = ({ value, onChange, placeholder = 'Nhập link ảnh ho
       setInputValue(fallbackRelativeUrl);
       if (onChange) onChange(fallbackRelativeUrl);
       notification.info({
-        message: 'Đã tạo đường dẫn ảnh tương đối BE',
+        message: t('common.info'),
         description: fallbackRelativeUrl,
       });
     } finally {
@@ -74,12 +76,12 @@ const ImageUploadInput = ({ value, onChange, placeholder = 'Nhập link ảnh ho
             <div className="text-xs font-bold text-slate-800 truncate font-mono">
               {inputValue}
             </div>
-            <div className="text-[11px] text-emerald-600 font-medium mt-0.5">Đã xem trước hình ảnh từ BE</div>
+            <div className="text-[11px] text-emerald-600 font-medium mt-0.5">{t('common.preview')}</div>
           </div>
 
           <Upload beforeUpload={handleFileSelect} showUploadList={false} accept="image/*">
             <Button size="small" icon={uploading ? <LoadingOutlined /> : <PictureOutlined />} loading={uploading} className="text-xs font-semibold">
-              Đổi ảnh
+              {t('common.changeImage')}
             </Button>
           </Upload>
 
@@ -93,14 +95,14 @@ const ImageUploadInput = ({ value, onChange, placeholder = 'Nhập link ảnh ho
               loading={uploading}
               className="bg-indigo-50 border-indigo-200 text-indigo-700 font-bold hover:bg-indigo-100 shadow-2xs w-full sm:w-auto text-xs"
             >
-              {uploading ? 'Đang tải ảnh lên BE...' : 'Chọn ảnh từ máy (Tải lên BE)'}
+              {uploading ? t('common.loading') : t('common.uploadImage')}
             </Button>
           </Upload>
 
           <Input
             value={inputValue}
             onChange={handleTextChange}
-            placeholder={placeholder}
+            placeholder={placeholder || t('common.select')}
             prefix={<LinkOutlined className="text-slate-400" />}
             className="rounded-xl text-xs flex-1"
             allowClear

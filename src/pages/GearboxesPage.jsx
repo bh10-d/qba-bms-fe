@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, Avatar, Image, notification } from 'antd';
+import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, Avatar, Image, Tooltip, notification } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, SettingOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { gearboxesApi } from '../api/modulesApi';
 import ImageUploadInput from '../components/ImageUploadInput';
 import { resolveUrl } from '../utils/resolveUrl';
@@ -8,6 +9,7 @@ import { resolveUrl } from '../utils/resolveUrl';
 const { Title, Text } = Typography;
 
 const GearboxesPage = () => {
+  const { t } = useTranslation();
   const [gearboxes, setGearboxes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -56,16 +58,16 @@ const GearboxesPage = () => {
         await gearboxesApi.update(editingGearbox.id, values);
         setGearboxes(gearboxes.map((g) => (g.id === editingGearbox.id ? { ...g, ...values } : g)));
         notification.success({
-          message: 'Cập nhật hộp số thành công',
-          description: `Đã cập nhật thông tin hộp số "${values.name}".`,
+          message: t('common.success'),
+          description: values.name,
         });
       } else {
         const res = await gearboxesApi.create(values);
         const newGearbox = res?.data || { id: Date.now(), ...values };
         setGearboxes([newGearbox, ...gearboxes]);
         notification.success({
-          message: 'Thêm hộp số mới thành công',
-          description: `Đã thêm hộp số "${values.name}" vào danh mục.`,
+          message: t('common.success'),
+          description: values.name,
         });
       }
       setIsModalOpen(false);
@@ -77,8 +79,8 @@ const GearboxesPage = () => {
         setGearboxes([{ id: Date.now(), ...values }, ...gearboxes]);
       }
       notification.success({
-        message: 'Đã lưu hộp số',
-        description: `Đã lưu hộp số "${values.name}".`,
+        message: t('common.success'),
+        description: values.name,
       });
       setIsModalOpen(false);
     } finally {
@@ -88,7 +90,7 @@ const GearboxesPage = () => {
 
   const handleDelete = async (record) => {
     const targetId = typeof record === 'object' ? record.id : record;
-    const targetName = typeof record === 'object' ? record.name : 'hộp số';
+    const targetName = typeof record === 'object' ? record.name : '';
     try {
       await gearboxesApi.delete(targetId);
     } catch (err) {
@@ -96,74 +98,68 @@ const GearboxesPage = () => {
     } finally {
       setGearboxes(gearboxes.filter((g) => g.id !== targetId));
       notification.info({
-        message: 'Xóa hộp số thành công',
-        description: `Đã xóa "${targetName}" khỏi danh mục hộp số.`,
+        message: t('common.info'),
+        description: targetName,
       });
     }
   };
 
   const filteredGearboxes = gearboxes.filter(
     (g) =>
-      g.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      (g.name || '').toLowerCase().includes(searchText.toLowerCase()) ||
       (g.brand && g.brand.toLowerCase().includes(searchText.toLowerCase()))
   );
 
   const columns = [
     {
-      title: 'Mã / Tên Hộp Số',
+      title: t('gearboxes.name'),
       dataIndex: 'name',
       key: 'name',
       render: (text, record) => {
         const src = resolveUrl(record.imageUrl);
         const initialLetter = (text || 'G')[0].toUpperCase();
         return (
-          <div className="flex items-center gap-2.5">
-            {src ? (
-              <Image src={src} alt={text} width={36} height={36} className="object-cover rounded-lg border border-slate-200" />
-            ) : (
-              <Avatar shape="square" size={36} className="bg-cyan-50 text-cyan-700 font-extrabold text-xs rounded-lg border border-cyan-200 shrink-0 flex items-center justify-center">
-                {initialLetter}
-              </Avatar>
-            )}
-            <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              {text}
-            </span>
-          </div>
+          <Tooltip title={text} placement="topLeft">
+            <div className="flex items-center gap-2.5 max-w-[220px]">
+              {src ? (
+                <Image src={src} alt={text} width={36} height={36} className="object-cover rounded-lg border border-slate-200 shrink-0" />
+              ) : (
+                <Avatar shape="square" size={36} className="bg-cyan-50 text-cyan-700 font-extrabold text-xs rounded-lg border border-cyan-200 shrink-0 flex items-center justify-center">
+                  {initialLetter}
+                </Avatar>
+              )}
+              <span className="font-bold text-slate-900 text-sm truncate">
+                {text}
+              </span>
+            </div>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Nhãn Hiệu',
+      title: t('brands.name'),
       dataIndex: 'brand',
       key: 'brand',
       render: (brand) => <Tag color="cyan" className="font-semibold">{brand || 'Sinotruk'}</Tag>,
     },
     {
-      title: 'Tỷ Số Truyền (Ratio)',
-      dataIndex: 'ratio',
-      key: 'ratio',
-      render: (ratio) => <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded text-xs">{ratio || '14.28'}</code>,
-    },
-    {
-      title: 'Chủng Loại Số',
+      title: t('gearboxes.speeds'),
       dataIndex: 'category',
       key: 'category',
-      render: (cat) => <span className="text-xs font-semibold text-slate-700">{cat || '10 số tiến + 2 số lùi'}</span>,
+      render: (cat) => <span className="text-xs font-semibold text-slate-700">{cat || '10 speeds'}</span>,
     },
     {
-      title: 'Loại Xe Sử Dụng',
-      dataIndex: 'vehicleModels',
-      key: 'vehicleModels',
-      render: (models) => <span className="text-xs text-slate-600">{models || 'HOWO'}</span>,
-    },
-    {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
-          <Popconfirm title="Xóa hộp số này?" onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
-            <Button type="text" danger icon={<DeleteOutlined />} />
+          <Tooltip title={t('common.edit')}>
+            <Button type="text" size="small" aria-label={t('common.edit')} icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
+          </Tooltip>
+          <Popconfirm title={t('gearboxes.deleteConfirm')} onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
+            <Tooltip title={t('common.delete')}>
+              <Button type="text" danger size="small" aria-label={t('common.delete')} icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -176,16 +172,16 @@ const GearboxesPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <SettingOutlined className="text-cyan-600" /> Quản Lý Hộp Số (Gearboxes)
+            <SettingOutlined className="text-cyan-600" /> {t('gearboxes.title')}
           </h2>
           <Text className="text-slate-500 text-xs mt-1 block">
-            Mã hộp số, tỷ số truyền & phân loại số (`/api/v1/gearboxes`)
+            {t('gearboxes.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={fetchGearboxes} loading={loading} className="text-xs font-semibold">
-            Làm mới
+            {t('common.reload')}
           </Button>
           <Button
             type="primary"
@@ -193,7 +189,7 @@ const GearboxesPage = () => {
             onClick={() => handleOpenModal()}
             className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
           >
-            Thêm Hộp Số
+            {t('gearboxes.createNew')}
           </Button>
         </Space>
       </div>
@@ -202,70 +198,78 @@ const GearboxesPage = () => {
       <Card className="rounded-xl border-slate-200 shadow-xs">
         <div className="mb-4 max-w-sm">
           <Input
-            placeholder="Tìm kiếm hộp số..."
+            placeholder={t('gearboxes.searchPlaceholder')}
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             allowClear
-            className="rounded-xl"
+            className="rounded-xl text-xs"
           />
         </div>
 
         <Table
+          size="middle"
           columns={columns}
           dataSource={filteredGearboxes}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
+          locale={{
+            emptyText: searchText ? (
+              <div className="py-8 text-center">
+                <SearchOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button size="small" onClick={() => setSearchText('')} className="text-xs mt-2">{t('common.clear')}</Button>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <SettingOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => handleOpenModal()} className="bg-indigo-600 border-0 text-xs mt-3">
+                  {t('gearboxes.createNew')}
+                </Button>
+              </div>
+            ),
+          }}
           pagination={{
             defaultPageSize: 10,
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} hộp số`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
         />
       </Card>
 
       {/* Add/Edit Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">{editingGearbox ? 'Cập Nhật Hộp Số' : 'Thêm Hộp Số Mới'}</span>}
+        title={<span className="font-bold text-slate-900">{editingGearbox ? t('gearboxes.editTitle') : t('gearboxes.createNew')}</span>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         destroyOnHidden
+        width={640}
       >
         <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
-          <Form.Item label="Mã / Tên Hộp Số" name="name" rules={[{ required: true, message: 'Nhập tên hộp số!' }]}>
+          <Form.Item label={t('gearboxes.name')} name="name" rules={[{ required: true, message: t('common.required') }]}>
             <Input placeholder="HW19710" />
           </Form.Item>
 
-          <Form.Item label="Hình Ảnh Hộp Số" name="imageUrl">
-            <ImageUploadInput resModel="gearbox" placeholder="/api/v1/attachments/... hoặc chọn ảnh từ máy..." />
+          <Form.Item label={t('common.image')} name="imageUrl">
+            <ImageUploadInput resModel="gearbox" placeholder="/uploads/..." />
           </Form.Item>
 
-          <Form.Item label="Nhãn Hiệu" name="brand">
+          <Form.Item label={t('brands.name')} name="brand">
             <Input placeholder="Sinotruk" />
           </Form.Item>
 
-          <Form.Item label="Tỷ Số Truyền (Ratio)" name="ratio">
-            <Input placeholder="14.28" />
-          </Form.Item>
-
-          <Form.Item label="Chủng Loại (Cấp Số)" name="category">
-            <Input placeholder="10 số tiến + 2 số lùi" />
-          </Form.Item>
-
-          <Form.Item label="Loại Xe Sử Dụng" name="vehicleModels">
-            <Input placeholder="HOWO 371, HOWO A7" />
-          </Form.Item>
-
-          <Form.Item label="Ghi Chú" name="note">
-            <Input.TextArea rows={2} placeholder="Vỏ gang siêu bền, có trợ lực khí nén..." />
+          <Form.Item label={t('gearboxes.description')} name="note">
+            <Input.TextArea rows={2} placeholder="..." />
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={submitting} className="bg-indigo-600">
-              Lưu Hộp Số
+              {t('common.save')}
             </Button>
           </div>
         </Form>

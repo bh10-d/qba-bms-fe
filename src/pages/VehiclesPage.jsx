@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, Select, Avatar, Image, notification } from 'antd';
+import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, Select, Avatar, Image, Tooltip, notification } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, CarOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { vehiclesApi, enginesApi, gearboxesApi } from '../api/modulesApi';
 import ImageUploadInput from '../components/ImageUploadInput';
 import { resolveUrl } from '../utils/resolveUrl';
@@ -8,6 +9,7 @@ import { resolveUrl } from '../utils/resolveUrl';
 const { Title, Text } = Typography;
 
 const VehiclesPage = () => {
+  const { t } = useTranslation();
   const [vehicles, setVehicles] = useState([]);
   const [enginesList, setEnginesList] = useState([]);
   const [gearboxesList, setGearboxesList] = useState([]);
@@ -84,8 +86,8 @@ const VehiclesPage = () => {
     const selectedEng = enginesList.find((e) => String(e.id) === String(values.engineId));
     const selectedGb = gearboxesList.find((g) => String(g.id) === String(values.gearboxId));
 
-    const engineName = selectedEng?.name || selectedEng?.code || 'Động cơ';
-    const gearboxName = selectedGb?.name || selectedGb?.code || 'Hộp số';
+    const engineName = selectedEng?.name || selectedEng?.code || t('vehicles.engine');
+    const gearboxName = selectedGb?.name || selectedGb?.code || t('vehicles.gearbox');
 
     const payload = {};
     if (values.name) payload.name = values.name;
@@ -104,8 +106,8 @@ const VehiclesPage = () => {
         await vehiclesApi.update(editingVehicle.id, payload);
         setVehicles(vehicles.map((v) => (v.id === editingVehicle.id ? { ...v, ...payload, engineName, gearboxName } : v)));
         notification.success({
-          message: 'Cập nhật dòng xe thành công',
-          description: `Đã cập nhật thông tin dòng xe "${values.name}".`,
+          message: t('common.success'),
+          description: values.name,
         });
       } else {
         const res = await vehiclesApi.create(payload);
@@ -119,8 +121,8 @@ const VehiclesPage = () => {
         };
         setVehicles([newVehicle, ...vehicles]);
         notification.success({
-          message: 'Thêm dòng xe mới thành công',
-          description: `Đã thêm xe "${values.name}" vào danh mục dòng xe.`,
+          message: t('common.success'),
+          description: values.name,
         });
       }
       setIsModalOpen(false);
@@ -132,8 +134,8 @@ const VehiclesPage = () => {
         setVehicles([{ id: Date.now(), ...payload, engineName, gearboxName }, ...vehicles]);
       }
       notification.success({
-        message: 'Đã lưu thông tin xe',
-        description: `Đã lưu xe "${values.name}".`,
+        message: t('common.success'),
+        description: values.name,
       });
       setIsModalOpen(false);
     } finally {
@@ -143,7 +145,7 @@ const VehiclesPage = () => {
 
   const handleDelete = async (record) => {
     const targetId = typeof record === 'object' ? record.id : record;
-    const targetName = typeof record === 'object' ? (record.name || record.title) : 'dòng xe';
+    const targetName = typeof record === 'object' ? (record.name || record.title) : '';
     try {
       await vehiclesApi.delete(targetId);
     } catch (err) {
@@ -151,8 +153,8 @@ const VehiclesPage = () => {
     } finally {
       setVehicles(vehicles.filter((v) => v.id !== targetId));
       notification.info({
-        message: 'Xóa dòng xe thành công',
-        description: `Đã xóa "${targetName}" khỏi danh mục dòng xe.`,
+        message: t('common.info'),
+        description: targetName,
       });
     }
   };
@@ -166,77 +168,83 @@ const VehiclesPage = () => {
 
   const columns = [
     {
-      title: 'Tên Xe',
+      title: t('vehicles.name'),
       key: 'name',
       render: (_, record) => {
-        const name = record.name || record.title || 'Dòng xe';
+        const name = record.name || record.title || 'Vehicle';
         const src = resolveUrl(record.imageUrl);
         const initialLetter = (name || 'V')[0].toUpperCase();
 
         return (
-          <div className="flex items-center gap-2.5">
-            {src ? (
-              <Image src={src} alt={name} width={36} height={36} className="object-cover rounded-lg border border-slate-200" />
-            ) : (
-              <Avatar shape="square" size={36} className="bg-indigo-50 text-indigo-700 font-extrabold text-xs rounded-lg border border-indigo-200 shrink-0 flex items-center justify-center">
-                {initialLetter}
-              </Avatar>
-            )}
-            <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              {name}
-            </span>
-          </div>
+          <Tooltip title={name} placement="topLeft">
+            <div className="flex items-center gap-2.5 max-w-[240px]">
+              {src ? (
+                <Image src={src} alt={name} width={36} height={36} className="object-cover rounded-lg border border-slate-200 shrink-0" />
+              ) : (
+                <Avatar shape="square" size={36} className="bg-indigo-50 text-indigo-700 font-extrabold text-xs rounded-lg border border-indigo-200 shrink-0 flex items-center justify-center">
+                  {initialLetter}
+                </Avatar>
+              )}
+              <span className="font-bold text-slate-900 text-sm truncate">
+                {name}
+              </span>
+            </div>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Mã Model',
+      title: t('vehicles.code'),
       key: 'modelCode',
       render: (_, record) => {
         const code = record.modelCode || record.code || 'N/A';
-        return <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-mono">{code}</code>;
+        return <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-mono font-bold">{code}</code>;
       },
     },
     {
-      title: 'Chủng Loại & Năm',
+      title: t('vehicles.category'),
       key: 'category',
       render: (_, record) => (
         <span className="text-xs font-semibold text-slate-700">
-          {record.category || 'Xe'} ({record.year || '2022'})
+          {record.category || 'Vehicle'} ({record.year || '2024'})
         </span>
       ),
     },
     {
-      title: 'Cầu Xe & Đặc Chủng',
+      title: t('vehicles.axle'),
       key: 'axle',
       render: (_, record) => (
         <Tag color="purple" className="font-bold">
-          {record.axle || 'Cầu xe'} • {record.certificate || 'Đặc chủng'}
+          {record.axle || 'Axle'} • {record.certificate || 'Certificate'}
         </Tag>
       ),
     },
     {
-      title: 'Động Cơ & Hộp Số',
+      title: `${t('vehicles.engine')} & ${t('vehicles.gearbox')}`,
       key: 'components',
       render: (_, record) => {
-        const eName = record.engine?.name || record.engineName || (record.engineId ? enginesList.find((e) => String(e.id) === String(record.engineId))?.name : null) || 'Chưa chọn';
-        const gName = record.gearbox?.name || record.gearboxName || (record.gearboxId ? gearboxesList.find((g) => String(g.id) === String(record.gearboxId))?.name : null) || 'Chưa chọn';
+        const eName = record.engine?.name || record.engineName || (record.engineId ? enginesList.find((e) => String(e.id) === String(record.engineId))?.name : null) || 'N/A';
+        const gName = record.gearbox?.name || record.gearboxName || (record.gearboxId ? gearboxesList.find((g) => String(g.id) === String(record.gearboxId))?.name : null) || 'N/A';
         return (
           <div className="text-[11px] text-slate-600">
-            <div>Động cơ: <strong className="text-slate-800">{eName}</strong></div>
-            <div>Hộp số: <strong className="text-slate-800">{gName}</strong></div>
+            <div>{t('vehicles.engine')}: <strong className="text-slate-800">{eName}</strong></div>
+            <div>{t('vehicles.gearbox')}: <strong className="text-slate-800">{gName}</strong></div>
           </div>
         );
       },
     },
     {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
-          <Popconfirm title="Xóa xe này?" onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
-            <Button type="text" danger icon={<DeleteOutlined />} />
+          <Tooltip title={t('common.edit')}>
+            <Button type="text" size="small" aria-label={t('common.edit')} icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
+          </Tooltip>
+          <Popconfirm title={t('vehicles.deleteConfirm')} onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
+            <Tooltip title={t('common.delete')}>
+              <Button type="text" danger size="small" aria-label={t('common.delete')} icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -249,16 +257,16 @@ const VehiclesPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <CarOutlined className="text-indigo-600" /> Quản Lý Dòng Xe
+            <CarOutlined className="text-indigo-600" /> {t('vehicles.title')}
           </h2>
           <Text className="text-slate-500 text-xs mt-1 block">
-            Danh mục xe đầu kéo, xe ben, xe tải thùng và trang bị Động cơ / Hộp số
+            {t('vehicles.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={fetchVehicles} loading={loading} className="text-xs font-semibold">
-            Làm mới
+            {t('common.reload')}
           </Button>
           <Button
             type="primary"
@@ -266,7 +274,7 @@ const VehiclesPage = () => {
             onClick={() => handleOpenModal()}
             className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
           >
-            Thêm Xe Mới
+            {t('vehicles.createNew')}
           </Button>
         </Space>
       </div>
@@ -275,101 +283,120 @@ const VehiclesPage = () => {
       <Card className="rounded-xl border-slate-200 shadow-xs">
         <div className="mb-4 max-w-sm">
           <Input
-            placeholder="Tìm kiếm xe..."
+            placeholder={t('vehicles.searchPlaceholder')}
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             allowClear
-            className="rounded-xl"
+            className="rounded-xl text-xs"
           />
         </div>
 
         <Table
+          size="middle"
           columns={columns}
           dataSource={filteredVehicles}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
+          locale={{
+            emptyText: searchText ? (
+              <div className="py-8 text-center">
+                <SearchOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button size="small" onClick={() => setSearchText('')} className="text-xs mt-2">{t('common.clear')}</Button>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <CarOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => handleOpenModal()} className="bg-indigo-600 border-0 text-xs mt-3">
+                  {t('vehicles.createNew')}
+                </Button>
+              </div>
+            ),
+          }}
           pagination={{
             defaultPageSize: 10,
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} xe`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
         />
       </Card>
 
       {/* Add/Edit Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">{editingVehicle ? 'Cập Nhật Thông Tin Xe' : 'Thêm Xe Mới'}</span>}
+        title={<span className="font-bold text-slate-900">{editingVehicle ? t('vehicles.editTitle') : t('vehicles.createNew')}</span>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         destroyOnHidden
-        width={600}
+        width={640}
       >
         <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
-          <Form.Item label="Tên Xe" name="name" rules={[{ required: true, message: 'Nhập tên xe!' }]}>
-            <Input placeholder="HOWO A7 375HP Cầu Dầu" />
+          <Form.Item label={t('vehicles.name')} name="name" rules={[{ required: true, message: t('common.required') }]}>
+            <Input placeholder="HOWO A7 375HP" />
           </Form.Item>
 
-          <Form.Item label="Hình Ảnh Dòng Xe" name="imageUrl">
-            <ImageUploadInput resModel="vehicle" placeholder="/api/v1/attachments/... hoặc chọn ảnh từ máy..." />
+          <Form.Item label={t('vehicles.image')} name="imageUrl">
+            <ImageUploadInput resModel="vehicle" placeholder="/uploads/..." />
           </Form.Item>
 
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item label="Mã Model" name="modelCode">
+            <Form.Item label={t('vehicles.code')} name="modelCode">
               <Input placeholder="ZZ4257N3247N1" />
             </Form.Item>
-            <Form.Item label="Chủng Loại Xe" name="category">
-              <Input placeholder="Xe Đầu Kéo" />
+            <Form.Item label={t('vehicles.category')} name="category">
+              <Input placeholder="Tractor / Truck" />
             </Form.Item>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <Form.Item label="Năm Sản Xuất" name="year">
-              <Input placeholder="2022" />
+            <Form.Item label={t('vehicles.year')} name="year">
+              <Input placeholder="2024" />
             </Form.Item>
-            <Form.Item label="Đặc Chủng" name="certificate">
-              <Input placeholder="Cầu Dầu" />
+            <Form.Item label={t('vehicles.certificate')} name="certificate">
+              <Input placeholder="Cert" />
             </Form.Item>
-            <Form.Item label="Cầu Xe (Axle)" name="axle">
+            <Form.Item label={t('vehicles.axle')} name="axle">
               <Input placeholder="HC16" />
             </Form.Item>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item label="Động Cơ Trang Bị" name="engineId">
+            <Form.Item label={t('vehicles.engine')} name="engineId">
               <Select
-                placeholder="Chọn động cơ..."
+                placeholder={t('vehicles.selectEngine')}
                 showSearch
                 optionFilterProp="label"
                 options={enginesList.map((e) => ({
                   value: e.id,
-                  label: `${e.name || e.code || `Động cơ #${e.id}`}`,
+                  label: `${e.name || e.code || `Engine #${e.id}`}`,
                 }))}
               />
             </Form.Item>
-            <Form.Item label="Hộp Số Trang Bị" name="gearboxId">
+            <Form.Item label={t('vehicles.gearbox')} name="gearboxId">
               <Select
-                placeholder="Chọn hộp số..."
+                placeholder={t('vehicles.selectGearbox')}
                 showSearch
                 optionFilterProp="label"
                 options={gearboxesList.map((g) => ({
                   value: g.id,
-                  label: `${g.name || g.code || `Hộp số #${g.id}`}`,
+                  label: `${g.name || g.code || `Gearbox #${g.id}`}`,
                 }))}
               />
             </Form.Item>
           </div>
 
-          <Form.Item label="Ghi Chú" name="note">
-            <Input.TextArea rows={2} placeholder="Lốp 12.00R20, mâm xoay JOST 50#..." />
+          <Form.Item label={t('vehicles.note')} name="note">
+            <Input.TextArea rows={2} placeholder="..." />
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={submitting} className="bg-indigo-600">
-              Lưu Thông Tin Xe
+              {t('common.save')}
             </Button>
           </div>
         </Form>

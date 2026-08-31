@@ -11,7 +11,7 @@ notification.config({
 export const notify = {
   success: (msg, desc) => {
     notification.success({
-      message: msg,
+      title: msg,
       description: desc,
       placement: 'topRight',
       duration: 1.5,
@@ -19,7 +19,7 @@ export const notify = {
   },
   error: (msg, desc) => {
     notification.error({
-      message: msg,
+      title: msg,
       description: desc,
       placement: 'topRight',
       duration: 2.0,
@@ -27,7 +27,7 @@ export const notify = {
   },
   info: (msg, desc) => {
     notification.info({
-      message: msg,
+      title: msg,
       description: desc,
       placement: 'topRight',
       duration: 1.5,
@@ -35,7 +35,7 @@ export const notify = {
   },
   warning: (msg, desc) => {
     notification.warning({
-      message: msg,
+      title: msg,
       description: desc,
       placement: 'topRight',
       duration: 1.5,

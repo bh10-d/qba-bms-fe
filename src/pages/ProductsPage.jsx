@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, Select, Avatar, Image, notification } from 'antd';
+import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, Select, Avatar, Image, Tooltip, notification, Alert } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, BoxPlotOutlined, BarcodeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { productsApi, brandsApi, vehiclesApi, enginesApi, gearboxesApi } from '../api/modulesApi';
 import ImageUploadInput from '../components/ImageUploadInput';
 import { resolveUrl } from '../utils/resolveUrl';
@@ -8,14 +9,16 @@ import { resolveUrl } from '../utils/resolveUrl';
 const { Title, Text } = Typography;
 
 const ProductsPage = () => {
+  const { t } = useTranslation();
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [brandsList, setBrandsList] = useState([]);
   const [vehiclesList, setVehiclesList] = useState([]);
   const [enginesList, setEnginesList] = useState([]);
   const [gearboxesList, setGearboxesList] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
 
+  const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [form] = Form.useForm();
@@ -23,6 +26,7 @@ const ProductsPage = () => {
 
   const fetchProducts = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await productsApi.getAll();
       const data = res?.data || res;
@@ -33,7 +37,7 @@ const ProductsPage = () => {
       }
     } catch (err) {
       console.warn('API products fetch failed:', err);
-      setProducts([]);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -96,7 +100,7 @@ const ProductsPage = () => {
   const handleSave = async (values) => {
     setSubmitting(true);
     const selectedBrand = brandsList.find((b) => String(b.id) === String(values.brandId));
-    const brandName = selectedBrand?.name || 'Thương hiệu';
+    const brandName = selectedBrand?.name || 'Brand';
 
     const payload = {};
     if (values.name) payload.name = values.name;
@@ -113,8 +117,8 @@ const ProductsPage = () => {
         await productsApi.update(editingProduct.id, payload);
         setProducts(products.map((p) => (p.id === editingProduct.id ? { ...p, ...payload, brandName } : p)));
         notification.success({
-          message: 'Cập nhật sản phẩm thành công',
-          description: `Đã cập nhật thông tin sản phẩm "${values.name}".`,
+          message: t('common.success'),
+          description: values.name,
         });
       } else {
         const res = await productsApi.create(payload);
@@ -127,8 +131,8 @@ const ProductsPage = () => {
         };
         setProducts([newProduct, ...products]);
         notification.success({
-          message: 'Thêm sản phẩm mới thành công',
-          description: `Đã thêm sản phẩm "${values.name}" vào danh mục phụ tùng.`,
+          message: t('common.success'),
+          description: values.name,
         });
       }
       setIsModalOpen(false);
@@ -140,8 +144,8 @@ const ProductsPage = () => {
         setProducts([{ id: Date.now(), ...payload, brandName }, ...products]);
       }
       notification.success({
-        message: 'Đã lưu sản phẩm',
-        description: `Đã lưu sản phẩm "${values.name}".`,
+        message: t('common.success'),
+        description: values.name,
       });
       setIsModalOpen(false);
     } finally {
@@ -151,7 +155,7 @@ const ProductsPage = () => {
 
   const handleDelete = async (record) => {
     const targetId = typeof record === 'object' ? record.id : record;
-    const targetName = typeof record === 'object' ? (record.name || record.title) : 'sản phẩm';
+    const targetName = typeof record === 'object' ? (record.name || record.title) : '';
     try {
       await productsApi.delete(targetId);
     } catch (err) {
@@ -159,8 +163,8 @@ const ProductsPage = () => {
     } finally {
       setProducts(products.filter((p) => p.id !== targetId));
       notification.info({
-        message: 'Xóa sản phẩm thành công',
-        description: `Đã xóa "${targetName}" khỏi hệ thống.`,
+        message: t('common.info'),
+        description: targetName,
       });
     }
   };
@@ -175,7 +179,7 @@ const ProductsPage = () => {
 
   const columns = [
     {
-      title: 'Hình Ảnh',
+      title: t('common.image'),
       dataIndex: 'imageUrl',
       key: 'imageUrl',
       width: 70,
@@ -207,19 +211,21 @@ const ProductsPage = () => {
       },
     },
     {
-      title: 'Tên Phụ Tùng / Sản Phẩm',
+      title: t('products.name'),
       key: 'name',
       render: (_, record) => {
-        const name = record.name || record.title || 'Sản phẩm phụ tùng';
+        const name = record.name || record.title || 'Product';
         return (
-          <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
-            {name}
-          </span>
+          <Tooltip title={name} placement="topLeft">
+            <span className="font-bold text-slate-900 text-sm truncate block max-w-[260px]">
+              {name}
+            </span>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Mã SKU / Barcode',
+      title: t('products.code'),
       key: 'codes',
       render: (_, record) => {
         const defaultCode = record.defaultCode || record.code || record.sku || record.barcode || 'N/A';
@@ -235,83 +241,48 @@ const ProductsPage = () => {
       },
     },
     {
-      title: 'Thương Hiệu',
+      title: t('brands.name'),
       key: 'brandName',
       render: (_, record) => {
         const bName =
           record.brand?.name ||
           record.brandName ||
           (record.brandId ? brandsList.find((b) => String(b.id) === String(record.brandId))?.name : null) ||
-          'Chưa phân loại';
+          'N/A';
         return <Tag color="blue" className="font-semibold">{bName}</Tag>;
       },
     },
     {
-      title: 'Dòng Xe Tương Thích',
-      key: 'vehicleNames',
-      render: (_, record) => {
-        let vNames = [];
-        if (Array.isArray(record.vehicles) && record.vehicles.length > 0) {
-          vNames = record.vehicles.map((v) => (typeof v === 'object' ? (v.name || v.title) : v));
-        } else if (Array.isArray(record.vehicleNames) && record.vehicleNames.length > 0) {
-          vNames = record.vehicleNames;
-        } else if (Array.isArray(record.vehicleIds) && record.vehicleIds.length > 0) {
-          vNames = record.vehicleIds.map((id) => vehiclesList.find((v) => String(v.id) === String(id))?.name || `Xe #${id}`);
-        }
-
-        return (
-          <div className="flex flex-wrap gap-1 max-w-xs">
-            {vNames.length > 0 ? (
-              vNames.map((v, idx) => (
-                <Tag key={idx} color="purple" className="text-[11px] font-medium m-0">
-                  {v}
-                </Tag>
-              ))
-            ) : (
-              <span className="text-slate-400 text-xs italic">Tất cả dòng xe</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      title: 'Động Cơ & Hộp Số',
-      key: 'relations',
-      render: (_, record) => {
-        let eNames = [];
-        if (Array.isArray(record.engines) && record.engines.length > 0) {
-          eNames = record.engines.map((e) => (typeof e === 'object' ? (e.name || e.code) : e));
-        } else if (Array.isArray(record.engineNames) && record.engineNames.length > 0) {
-          eNames = record.engineNames;
-        } else if (Array.isArray(record.engineIds) && record.engineIds.length > 0) {
-          eNames = record.engineIds.map((id) => enginesList.find((e) => String(e.id) === String(id))?.name || `ĐC #${id}`);
-        }
-
-        let gNames = [];
-        if (Array.isArray(record.gearboxes) && record.gearboxes.length > 0) {
-          gNames = record.gearboxes.map((g) => (typeof g === 'object' ? (g.name || g.code) : g));
-        } else if (Array.isArray(record.gearboxNames) && record.gearboxNames.length > 0) {
-          gNames = record.gearboxNames;
-        } else if (Array.isArray(record.gearboxIds) && record.gearboxIds.length > 0) {
-          gNames = record.gearboxIds.map((id) => gearboxesList.find((g) => String(g.id) === String(id))?.name || `HS #${id}`);
-        }
-
-        return (
-          <div className="text-[11px] text-slate-600">
-            <div>Động cơ: <strong className="text-slate-800">{eNames.join(', ') || 'N/A'}</strong></div>
-            <div>Hộp số: <strong className="text-slate-800">{gNames.join(', ') || 'N/A'}</strong></div>
-          </div>
-        );
-      },
-    },
-    {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
-          <Popconfirm title="Xóa sản phẩm này?" onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
-            <Button type="text" danger icon={<DeleteOutlined />} />
+          <Tooltip title={t('common.edit')}>
+            <Button
+              type="text"
+              size="small"
+              aria-label={t('common.edit')}
+              icon={<EditOutlined className="text-indigo-600" />}
+              onClick={() => handleOpenModal(record)}
+            />
+          </Tooltip>
+
+          <Popconfirm
+            title={t('products.deleteConfirm')}
+            onConfirm={() => handleDelete(record)}
+            okButtonProps={{ danger: true }}
+            okText={t('common.delete')}
+            cancelText={t('common.cancel')}
+          >
+            <Tooltip title={t('common.delete')}>
+              <Button
+                type="text"
+                danger
+                size="small"
+                aria-label={t('common.delete')}
+                icon={<DeleteOutlined />}
+              />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -319,21 +290,21 @@ const ProductsPage = () => {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <BoxPlotOutlined className="text-indigo-600" /> Quản Lý Phụ Tùng & Sản Phẩm
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
+            <BoxPlotOutlined className="text-indigo-600" /> {t('products.title')}
           </h2>
-          <Text className="text-slate-500 text-xs mt-1 block">
-            Quản lý danh mục phụ tùng xe, mã SKU thương hiệu và tương thích động cơ, hộp số
+          <Text className="text-slate-500 text-xs mt-0.5 block">
+            {t('products.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={fetchProducts} loading={loading} className="text-xs font-semibold">
-            Làm mới
+            {t('common.reload')}
           </Button>
           <Button
             type="primary"
@@ -341,135 +312,108 @@ const ProductsPage = () => {
             onClick={() => handleOpenModal()}
             className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
           >
-            Thêm Sản Phẩm Mới
+            {t('products.createNew')}
           </Button>
         </Space>
       </div>
 
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message={t('common.error')}
+          action={
+            <Button size="small" type="primary" danger onClick={fetchProducts} loading={loading}>
+              {t('common.reload')}
+            </Button>
+          }
+          className="rounded-xl mb-4"
+        />
+      )}
+
       {/* Table Card */}
       <Card className="rounded-xl border-slate-200 shadow-xs">
-        <div className="mb-4 max-w-sm">
+        <div className="mb-3 max-w-md">
           <Input
-            placeholder="Tìm kiếm sản phẩm hoặc mã SKU..."
+            placeholder={t('products.searchPlaceholder')}
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             allowClear
-            className="rounded-xl"
+            className="rounded-xl text-xs"
           />
         </div>
 
         <Table
+          size="middle"
           columns={columns}
           dataSource={filteredProducts}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
+          locale={{
+            emptyText: (
+              <div className="py-8 text-center">
+                <BoxPlotOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => handleOpenModal()} className="bg-indigo-600 border-0 text-xs mt-3">
+                  {t('products.createNew')}
+                </Button>
+              </div>
+            ),
+          }}
           pagination={{
             defaultPageSize: 10,
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} sản phẩm`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
         />
       </Card>
 
       {/* Add/Edit Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">{editingProduct ? 'Cập Nhật Sản Phẩm' : 'Thêm Sản Phẩm Mới'}</span>}
+        title={<span className="font-bold text-slate-900">{editingProduct ? t('products.editTitle') : t('products.createNew')}</span>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         destroyOnHidden
-        width={720}
+        width={800}
       >
         <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
-          <Form.Item label="Tên Phụ Tùng / Sản Phẩm" name="name" rules={[{ required: true, message: 'Nhập tên sản phẩm!' }]}>
-            <Input placeholder="Lọc Dầu Động Cơ HOWO A7" />
+          <Form.Item label={t('products.name')} name="name" rules={[{ required: true, message: t('common.required') }]}>
+            <Input placeholder="Product Name" />
           </Form.Item>
 
-          <Form.Item label="Hình Ảnh Sản Phẩm" name="imageUrl">
-            <ImageUploadInput resModel="product" placeholder="/api/v1/attachments/e30b446d.../raw hoặc chọn ảnh từ máy..." />
+          <Form.Item label={t('common.image')} name="imageUrl">
+            <ImageUploadInput resModel="product" placeholder="/uploads/..." />
           </Form.Item>
 
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item label="Mã Mặc Định Barcode (SKU)" name="defaultCode">
-              <Input placeholder="VG1540080015" />
+            <Form.Item label={t('products.code')} name="defaultCode">
+              <Input placeholder="CODE-123" />
             </Form.Item>
-            <Form.Item label="SKU Thương Hiệu" name="brandSku">
-              <Input placeholder="HW-LOC-001" />
+            <Form.Item label="SKU" name="brandSku">
+              <Input placeholder="SKU-123" />
             </Form.Item>
           </div>
 
-          <Form.Item label="Thương Hiệu Phân Loại" name="brandId" rules={[{ required: true, message: 'Vui lòng chọn thương hiệu!' }]}>
+          <Form.Item label={t('brands.name')} name="brandId" rules={[{ required: true, message: t('common.required') }]}>
             <Select
-              placeholder="Chọn thương hiệu phân loại từ hệ thống..."
+              placeholder={t('common.select')}
               showSearch
               optionFilterProp="label"
               options={brandsList.map((b) => ({
                 value: b.id,
-                label: `${b.name || b.code || `Thương hiệu #${b.id}`}`,
+                label: `${b.name || b.code || `Brand #${b.id}`}`,
               }))}
             />
           </Form.Item>
 
-          {/* Compatibility Relations */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl mb-4">
-            <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-              Liên Kết Tương Thích Xe & Phụ Tùng
-            </div>
-
-            <Form.Item label="Dòng Xe Tương Thích" name="vehicleIds" className="mb-3">
-              <Select
-                mode="multiple"
-                maxTagCount="responsive"
-                maxTagPlaceholder={(omittedValues) => `+${omittedValues.length} xe...`}
-                placeholder="Chọn các dòng xe tương thích..."
-                showSearch
-                optionFilterProp="label"
-                options={vehiclesList.map((v) => ({
-                  value: v.id,
-                  label: `${v.name || v.title} (${v.code || `ID #${v.id}`})`,
-                }))}
-              />
-            </Form.Item>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item label="Động Cơ Tương Thích" name="engineIds" className="mb-0">
-                <Select
-                  mode="multiple"
-                  maxTagCount="responsive"
-                  maxTagPlaceholder={(omittedValues) => `+${omittedValues.length} động cơ...`}
-                  placeholder="Chọn động cơ..."
-                  showSearch
-                  optionFilterProp="label"
-                  options={enginesList.map((e) => ({
-                    value: e.id,
-                    label: `${e.name || e.code || `Động cơ #${e.id}`}`,
-                  }))}
-                />
-              </Form.Item>
-
-              <Form.Item label="Hộp Số Tương Thích" name="gearboxIds" className="mb-0">
-                <Select
-                  mode="multiple"
-                  maxTagCount="responsive"
-                  maxTagPlaceholder={(omittedValues) => `+${omittedValues.length} hộp số...`}
-                  placeholder="Chọn hộp số..."
-                  showSearch
-                  optionFilterProp="label"
-                  options={gearboxesList.map((g) => ({
-                    value: g.id,
-                    label: `${g.name || g.code || `Hộp số #${g.id}`}`,
-                  }))}
-                />
-              </Form.Item>
-            </div>
-          </div>
-
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={submitting} className="bg-indigo-600">
-              Lưu Sản Phẩm
+              {t('common.save')}
             </Button>
           </div>
         </Form>

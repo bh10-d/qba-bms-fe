@@ -8,6 +8,7 @@ import {
   ExportOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import authApi from '../api/authApi';
 import { seedApi } from '../api/modulesApi';
@@ -15,6 +16,7 @@ import { seedApi } from '../api/modulesApi';
 const { Title, Text } = Typography;
 
 const ApiConsolePage = () => {
+  const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [copied, setCopied] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState('profile');
@@ -27,7 +29,7 @@ const ApiConsolePage = () => {
     if (accessToken) {
       navigator.clipboard.writeText(accessToken);
       setCopied(true);
-      notification.success({ message: 'Đã sao chép Access Token!' });
+      notification.success({ message: t('common.success') });
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -41,16 +43,16 @@ const ApiConsolePage = () => {
       if (selectedEndpoint === 'profile') {
         const res = await authApi.getProfile();
         setApiResult(res);
-        notification.success({ message: 'Gửi request GET /auth/profile thành công (200 OK)' });
+        notification.success({ message: t('common.success') });
       } else if (selectedEndpoint === 'logout') {
         await authApi.logout();
-        setApiResult({ statusCode: 200, message: 'Đăng xuất và đưa token vào Redis Blacklist thành công' });
-        notification.success({ message: 'Gửi request POST /auth/logout thành công' });
+        setApiResult({ statusCode: 200, message: 'Success' });
+        notification.success({ message: t('common.success') });
       }
     } catch (err) {
       console.error('Console API error:', err);
       setApiError(err);
-      notification.error({ message: err.message || 'Lỗi khi gửi request API' });
+      notification.error({ message: t('common.error') });
     } finally {
       setIsSending(false);
     }
@@ -61,16 +63,16 @@ const ApiConsolePage = () => {
     setApiError(null);
     try {
       const res = await seedApi.runSeed();
-      setApiResult(res || { statusCode: 200, message: 'Seed dữ liệu mẫu thành công cho tất cả các phân hệ Brands, Engines, Gearboxes, Vehicles, Products, Supplier Info, Users!' });
-      notification.success({ message: 'Nạp dữ liệu mẫu Seed thành công!' });
+      setApiResult(res || { statusCode: 200, message: 'Seed success' });
+      notification.success({ message: t('common.success') });
     } catch (err) {
       console.warn('Seed API error (showing demo seed response):', err);
       setApiResult({
         statusCode: 200,
-        message: 'Đã giả lập Seed thành công dữ liệu mẫu cho hệ thống!',
+        message: 'Seed success',
         seededModules: ['Brands', 'Engines', 'Gearboxes', 'Vehicles', 'Products', 'SupplierInfo', 'Users'],
       });
-      notification.success({ message: 'Nạp dữ liệu mẫu Seed thành công!' });
+      notification.success({ message: t('common.success') });
     } finally {
       setIsSeeding(false);
     }
@@ -85,10 +87,10 @@ const ApiConsolePage = () => {
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <ApiOutlined className="text-indigo-600" /> API Console & Seed Data
+            <ApiOutlined className="text-indigo-600" /> {t('apiConsole.title')}
           </h2>
           <Text className="text-slate-500 text-xs mt-1 block">
-            Kiểm tra Header `Authorization: Bearer &lt;accessToken&gt;` và nạp dữ liệu mẫu 1-click (`POST /api/v1/seed`)
+            {t('apiConsole.endpoint')}: {apiBaseUrl}
           </Text>
         </div>
 
@@ -100,7 +102,7 @@ const ApiConsolePage = () => {
             onClick={handleRunSeed}
             className="bg-emerald-600 hover:bg-emerald-500 font-bold text-xs border-0"
           >
-            1-Click Seed Data (POST /seed)
+            {t('apiConsole.runSeed')}
           </Button>
 
           <Button
@@ -118,17 +120,17 @@ const ApiConsolePage = () => {
       {/* Token & Config Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Token Card */}
-        <Card title={<span className="font-bold text-slate-900">JWT Access Token Hiện Tại</span>} className="rounded-xl border-slate-200">
+        <Card title={<span className="font-bold text-slate-900">{t('apiConsole.tokenTitle')}</span>} className="rounded-xl border-slate-200">
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-bold uppercase">Header Key:</span>
+              <span className="text-xs text-slate-500 font-bold uppercase">{t('apiConsole.headers')}:</span>
               <code className="text-xs bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">
                 Authorization: Bearer &lt;token&gt;
               </code>
             </div>
 
             <div className="bg-slate-900 text-emerald-400 p-3.5 rounded-xl border border-slate-800 font-mono text-xs break-all max-h-32 overflow-y-auto">
-              {accessToken || 'Chưa đăng nhập / Không có token'}
+              {accessToken || 'No active token'}
             </div>
 
             <div className="flex items-center justify-between pt-2">
@@ -139,17 +141,17 @@ const ApiConsolePage = () => {
                 onClick={handleCopyToken}
                 className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
               >
-                {copied ? 'Đã copy' : 'Sao chép Token'}
+                {t('apiConsole.copyToken')}
               </Button>
             </div>
           </div>
         </Card>
 
         {/* Server & Interceptor Config */}
-        <Card title={<span className="font-bold text-slate-900">Cấu Hình Backend & Database</span>} className="rounded-xl border-slate-200">
+        <Card title={<span className="font-bold text-slate-900">Backend & Server Config</span>} className="rounded-xl border-slate-200">
           <div className="flex flex-col gap-3 text-sm">
             <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-xs text-slate-500 font-semibold">Base URL:</span>
+              <span className="text-xs text-slate-500 font-semibold">{t('apiConsole.endpoint')}:</span>
               <code className="text-xs font-bold text-indigo-600">{apiBaseUrl}</code>
             </div>
 
@@ -159,7 +161,7 @@ const ApiConsolePage = () => {
             </div>
 
             <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-xs text-slate-500 font-semibold">Seed Data Endpoint:</span>
+              <span className="text-xs text-slate-500 font-semibold">Seed Endpoint:</span>
               <Tag color="emerald" className="font-bold">POST /api/v1/seed</Tag>
             </div>
           </div>
@@ -167,14 +169,14 @@ const ApiConsolePage = () => {
       </div>
 
       {/* Interactive API Request Sandbox */}
-      <Card title={<span className="font-bold text-slate-900">Thử Nghiệm Gửi Request API (API Sandbox)</span>} className="rounded-xl border-slate-200">
+      <Card title={<span className="font-bold text-slate-900">{t('apiConsole.execute')}</span>} className="rounded-xl border-slate-200">
         <div className="flex flex-col gap-4">
           <div>
-            <Text className="text-xs text-slate-500 font-bold uppercase block mb-2">Chọn Endpoint Cần Thử Nghiệm:</Text>
+            <Text className="text-xs text-slate-500 font-bold uppercase block mb-2">{t('apiConsole.method')}:</Text>
             <Segmented
               options={[
-                { label: 'GET /auth/profile (Lấy Profile)', value: 'profile' },
-                { label: 'POST /auth/logout (Đăng xuất)', value: 'logout' },
+                { label: 'GET /auth/profile', value: 'profile' },
+                { label: 'POST /auth/logout', value: 'logout' },
               ]}
               value={selectedEndpoint}
               onChange={(val) => setSelectedEndpoint(val)}
@@ -195,7 +197,7 @@ const ApiConsolePage = () => {
               onClick={handleExecuteApi}
               className="bg-indigo-600 hover:bg-indigo-500 font-semibold"
             >
-              Gửi Request
+              {t('apiConsole.execute')}
             </Button>
           </div>
 
@@ -203,7 +205,7 @@ const ApiConsolePage = () => {
           {apiResult && (
             <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-white">
               <div className="flex items-center justify-between text-xs font-bold text-emerald-400 mb-2 border-b border-slate-800 pb-2">
-                <span>Phản Hồi Từ Server (200 Success)</span>
+                <span>{t('apiConsole.responseBody')} (200 OK)</span>
                 <span className="font-mono">{new Date().toLocaleTimeString()}</span>
               </div>
               <pre className="font-mono text-xs text-cyan-300 max-h-60 overflow-auto m-0">
@@ -214,7 +216,7 @@ const ApiConsolePage = () => {
 
           {apiError && (
             <Alert
-              message="Lỗi Phản Hồi API"
+              message={t('common.error')}
               description={JSON.stringify(apiError, null, 2)}
               type="error"
               showIcon

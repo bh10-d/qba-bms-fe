@@ -9,15 +9,20 @@ import {
   Button,
   InputNumber,
   Tabs,
-  notification,
   AutoComplete,
-  Checkbox
+  Checkbox,
+  Tooltip,
+  App
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { purchasesApi, productsApi, supplierInfoApi } from '../api/modulesApi';
 import dayjs from 'dayjs';
+import CurrencyInputNumber from './CurrencyInputNumber';
 
 const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
+  const { t } = useTranslation();
+  const { notification } = App.useApp();
   const [form] = Form.useForm();
   const [items, setItems] = useState([]);
   const [productsList, setProductsList] = useState([]);
@@ -56,7 +61,7 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
   const handleAddItem = () => {
     setItems([
       ...items,
-      { key: Date.now() + Math.random(), productId: null, quantity: 1, uom: 'Cái', unitPrice: 0, amount: 0, isSample: false },
+      { key: Date.now() + Math.random(), productId: null, quantity: 1, uom: 'PCS', unitPrice: 0, amount: 0, isSample: false },
     ]);
   };
 
@@ -97,8 +102,8 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
       const validItems = items.filter((i) => i.productId && Number(i.quantity) > 0);
       if (validItems.length === 0) {
         notification.error({
-          message: 'Chưa chọn sản phẩm',
-          description: 'Vui lòng chọn ít nhất 1 sản phẩm phụ tùng vào đơn mua!',
+          title: t('common.error'),
+          description: t('common.error'),
         });
         return;
       }
@@ -119,22 +124,21 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
           quantity: Number(i.quantity),
           unitPrice: Number(i.unitPrice || 0),
           amount: i.isSample ? 0 : Number(i.quantity) * Number(i.unitPrice || 0),
-          uom: i.uom || 'Cái',
+          uom: i.uom || 'PCS',
         })),
       };
 
       await purchasesApi.create(payload);
       notification.success({
-        message: 'Tạo RFQ Thành Công',
-        description: 'Đã tạo Yêu cầu báo giá (RFQ) mới thành công!',
+        title: t('common.success'),
+        description: t('purchases.title'),
       });
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error('Create RFQ error:', err);
-      const msg = Array.isArray(err?.message) ? err.message.join(', ') : (err?.message || 'Không thể tạo đơn mua');
       notification.error({
-        message: 'Lỗi Tạo RFQ',
-        description: msg,
+        title: t('common.error'),
+        description: t('common.error'),
       });
     } finally {
       setSubmitting(false);
@@ -143,29 +147,37 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
 
   const itemColumns = [
     {
-      title: 'Phụ tùng / Sản phẩm',
+      title: t('products.name'),
       dataIndex: 'productId',
       key: 'productId',
+      width: 280,
       render: (val, record) => (
-        <Select
-          showSearch
-          className="w-full text-xs"
-          placeholder="Chọn phụ tùng từ hệ thống..."
-          value={val}
-          onChange={(v) => handleItemChange(record.key, 'productId', v)}
-          optionFilterProp="label"
-          options={productsList.map((p) => ({
-            value: p.id,
-            label: `[${p.defaultCode || p.brandSku || p.id}] ${p.name || p.title}`,
-          }))}
-        />
+        <div className="w-full min-w-0">
+          <Select
+            showSearch
+            className="w-full min-w-0 text-xs"
+            placeholder={t('common.select')}
+            value={val}
+            onChange={(v) => handleItemChange(record.key, 'productId', v)}
+            optionFilterProp="label"
+            options={productsList.map((p) => ({
+              value: p.id,
+              label: `[${p.defaultCode || p.brandSku || p.id}] ${p.name || p.title}`,
+            }))}
+            labelRender={(option) => (
+              <Tooltip title={option.label} placement="top">
+                <span className="truncate block w-full text-xs">{option.label}</span>
+              </Tooltip>
+            )}
+          />
+        </div>
       ),
     },
     {
-      title: 'Số lượng',
+      title: t('purchases.quantity'),
       dataIndex: 'quantity',
       key: 'quantity',
-      width: 90,
+      width: 85,
       render: (val, record) => (
         <InputNumber
           min={1}
@@ -176,57 +188,28 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
       ),
     },
     {
-      title: 'ĐVT',
-      dataIndex: 'uom',
-      key: 'uom',
-      width: 80,
-      render: (val, record) => (
-        <Input
-          value={val}
-          onChange={(e) => handleItemChange(record.key, 'uom', e.target.value)}
-          className="text-xs"
-        />
-      ),
-    },
-    {
-      title: 'Đơn giá (VND)',
+      title: t('products.unitPrice'),
       dataIndex: 'unitPrice',
       key: 'unitPrice',
-      width: 130,
+      width: 140,
       render: (val, record) => (
-        <InputNumber
+        <CurrencyInputNumber
           min={0}
           step={10000}
-          className="w-full text-xs font-mono"
+          className="w-full text-xs"
           value={val}
-          formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-          parser={(v) => v.replace(/\./g, '')}
           onChange={(v) => handleItemChange(record.key, 'unitPrice', v)}
         />
       ),
     },
     {
-      title: 'Hàng Mẫu / Bảo Hành',
-      dataIndex: 'isSample',
-      key: 'isSample',
-      width: 140,
-      render: (val, record) => (
-        <Checkbox
-          checked={Boolean(val)}
-          onChange={(e) => handleItemChange(record.key, 'isSample', e.target.checked)}
-        >
-          <span className="text-xs font-semibold text-amber-600">Bảo hành 0đ</span>
-        </Checkbox>
-      ),
-    },
-    {
-      title: 'Số tiền (VND)',
+      title: t('purchases.amount'),
       dataIndex: 'amount',
       key: 'amount',
       width: 130,
       render: (val) => (
-        <span className="font-bold text-slate-800 text-xs font-mono">
-          {Number(val || 0).toLocaleString('vi-VN')} đ
+        <span className="font-bold text-slate-800 text-xs font-mono tabular-nums whitespace-nowrap">
+          {Number(val || 0).toLocaleString()} đ
         </span>
       ),
     },
@@ -235,12 +218,15 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
       key: 'action',
       width: 50,
       render: (_, record) => (
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleRemoveItem(record.key)}
-        />
+        <Tooltip title={t('common.delete')}>
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleRemoveItem(record.key)}
+            aria-label={t('common.delete')}
+          />
+        </Tooltip>
       ),
     },
   ];
@@ -248,29 +234,35 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
   return (
     <Modal
       open={open}
-      title={<span className="font-bold text-slate-900 text-base">Tạo Yêu Cầu Báo Giá (RFQ) Mới</span>}
+      title={<span className="font-bold text-slate-900 text-base">{t('purchases.createNew')}</span>}
       onCancel={onCancel}
       width={960}
       onOk={handleSubmit}
       confirmLoading={submitting}
-      okText="Lưu Yêu Cầu Báo Giá"
-      cancelText="Hủy"
-      destroyOnClose
+      okText={t('common.save')}
+      cancelText={t('common.cancel')}
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" className="mt-3 text-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Form.Item
-            label={<span className="font-bold text-slate-700">Nhà cung cấp</span>}
+            label={<span className="font-bold text-slate-700">{t('suppliers.title')}</span>}
             name="supplierName"
-            rules={[{ required: true, message: 'Nhập tên nhà cung cấp!' }]}
+            rules={[{ required: true, message: t('common.required') }]}
           >
             <AutoComplete
-              placeholder="Gõ tên hoặc chọn nhà cung cấp từ hệ thống..."
+              placeholder={t('common.select')}
               allowClear
-              options={suppliersList.map((s) => ({
-                value: s.supplierName || s.name,
-                label: `${s.supplierName || s.name}${s.productCode ? ` (Mã NCC: ${s.productCode})` : ''}`,
-              }))}
+              options={suppliersList.reduce((acc, s) => {
+                const val = s.supplierName || s.name;
+                if (val && !acc.some((item) => item.value === val)) {
+                  acc.push({
+                    value: val,
+                    label: `${val}${s.productCode ? ` (${s.productCode})` : ''}`,
+                  });
+                }
+                return acc;
+              }, [])}
               filterOption={(inputValue, option) =>
                 String(option.value || '').toLowerCase().includes(inputValue.toLowerCase()) ||
                 String(option.label || '').toLowerCase().includes(inputValue.toLowerCase())
@@ -278,20 +270,8 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
             />
           </Form.Item>
 
-          <Form.Item label={<span className="font-bold text-slate-700">Hạn đặt hàng</span>} name="dateOrder">
+          <Form.Item label={<span className="font-bold text-slate-700">{t('common.createdAt')}</span>} name="dateOrder">
             <DatePicker showTime className="w-full rounded-lg" format="DD/MM/YYYY HH:mm" />
-          </Form.Item>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Form.Item label={<span className="font-bold text-slate-700">Mã nhà cung cấp (Partner Ref)</span>} name="partnerRef">
-            <Input placeholder="Ví dụ: TV 30/07/25" />
-          </Form.Item>
-          <Form.Item label={<span className="font-bold text-slate-700">Ngày hàng về dự kiến</span>} name="datePlanned">
-            <DatePicker className="w-full rounded-lg" format="DD/MM/YYYY" />
-          </Form.Item>
-          <Form.Item label={<span className="font-bold text-slate-700">Tiền tệ</span>} name="currency">
-            <Select options={[{ value: 'VND', label: 'VND' }, { value: 'USD', label: 'USD' }]} />
           </Form.Item>
         </div>
 
@@ -299,15 +279,17 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
           items={[
             {
               key: 'items',
-              label: <span className="font-bold">Sản phẩm</span>,
+              label: <span className="font-bold">{t('products.title')}</span>,
               children: (
                 <div>
                   <Table
+                    tableLayout="fixed"
                     dataSource={items}
                     columns={itemColumns}
                     pagination={false}
                     size="small"
                     bordered
+                    scroll={{ x: 940 }}
                   />
                   <Button
                     type="dashed"
@@ -316,45 +298,20 @@ const CreatePurchaseModal = ({ open, onCancel, onSuccess, currentUser }) => {
                     icon={<PlusOutlined />}
                     className="mt-3 font-semibold text-xs"
                   >
-                    Thêm sản phẩm
+                    {t('purchases.createNew')}
                   </Button>
 
                   <div className="flex justify-end mt-4">
                     <div className="text-right space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200 w-72">
                       <div className="text-slate-600 text-xs flex justify-between">
-                        <span>Số tiền trước thuế:</span>
-                        <strong className="text-slate-900 font-mono">{subtotal.toLocaleString('vi-VN')} đ</strong>
-                      </div>
-                      <div className="text-slate-600 text-xs flex justify-between">
-                        <span>Thuế GTGT (10%):</span>
-                        <strong className="text-slate-900 font-mono">{taxAmount.toLocaleString('vi-VN')} đ</strong>
+                        <span>Subtotal:</span>
+                        <strong className="text-slate-900 font-mono tabular-nums">{subtotal.toLocaleString()} đ</strong>
                       </div>
                       <div className="text-sm font-bold text-indigo-700 flex justify-between pt-1 border-t border-slate-200">
-                        <span>Tổng tiền:</span>
-                        <span className="font-mono text-base">{totalAmount.toLocaleString('vi-VN')} đ</span>
+                        <span>Total:</span>
+                        <span className="font-mono tabular-nums text-base">{totalAmount.toLocaleString()} đ</span>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: 'other',
-              label: <span className="font-bold">Thông tin khác</span>,
-              children: (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Form.Item label={<span className="font-bold text-slate-700">Bên mua (Người phụ trách)</span>} name="buyerName">
-                    <Input placeholder="Tên nhân viên phụ trách..." />
-                  </Form.Item>
-
-                  <Form.Item label={<span className="font-bold text-slate-700">Chứng từ gốc</span>} name="origin">
-                    <Input placeholder="Bổ sung thủ công" />
-                  </Form.Item>
-
-                  <div className="sm:col-span-2">
-                    <Form.Item label={<span className="font-bold text-slate-700">Ghi chú thêm</span>} name="notes">
-                      <Input.TextArea rows={3} placeholder="Nhập ghi chú yêu cầu báo giá..." />
-                    </Form.Item>
                   </div>
                 </div>
               ),

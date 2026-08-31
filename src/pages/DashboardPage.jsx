@@ -89,7 +89,7 @@ const DashboardPage = () => {
             danger
             icon={<LogoutOutlined />}
             onClick={logout}
-            className="border-slate-200 bg-slate-50 hover:bg-rose-50 text-slate-700 font-medium"
+            className="border-slate-200 bg-slate-50 hover:bg-rose-50 text-slate-900 font-semibold"
           >
             Đăng xuất
           </Button>

@@ -13,9 +13,13 @@ import {
   Drawer,
   InputNumber,
   Popconfirm,
-  notification,
   Tooltip,
-  Divider
+  Divider,
+  Row,
+  Col,
+  Statistic,
+  Alert,
+  App
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -30,22 +34,19 @@ import {
   DeleteOutlined,
   FileTextOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { ordersApi, productsApi } from '../api/modulesApi';
 import { accountingApi } from '../api/accountingApi';
+import CurrencyInputNumber from '../components/CurrencyInputNumber';
 
 const { Title, Text } = Typography;
 
-const STATUS_TAGS = {
-  QUOTATION: <Tag color="gold" className="font-bold">Báo giá DRAFT</Tag>,
-  CONFIRMED: <Tag color="green" className="font-bold">Đã xác nhận (CONFIRMED)</Tag>,
-  SHIPPED: <Tag color="blue" className="font-semibold">Đang giao hàng</Tag>,
-  DONE: <Tag color="purple" className="font-bold">Đã hoàn thành</Tag>,
-  CANCELLED: <Tag color="red" className="font-semibold">Đã hủy</Tag>,
-};
-
 const OrdersPage = () => {
+  const { t } = useTranslation();
+  const { notification } = App.useApp();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -62,14 +63,14 @@ const OrdersPage = () => {
     try {
       await accountingApi.createInvoiceFromOrder(targetOrder.id);
       notification.success({
-        message: 'Tạo Hóa Đơn Bán Hàng Thành Công',
-        description: `Đã tự động sinh Hóa đơn Bán hàng (OUT_INVOICE) cho đơn ${targetOrder.orderNumber || targetOrder.id}.`,
+        title: t('common.success'),
+        description: targetOrder.orderNumber || targetOrder.id,
       });
     } catch (err) {
       console.warn('Create invoice from order error:', err);
       notification.success({
-        message: 'Đã Tạo Hóa Đơn Bán Hàng',
-        description: `Đã tự động sinh Hóa đơn Bán hàng cho đơn ${targetOrder.orderNumber || targetOrder.id}.`,
+        title: t('common.success'),
+        description: targetOrder.orderNumber || targetOrder.id,
       });
     } finally {
       setCreatingInvoice(false);
@@ -83,10 +84,11 @@ const OrdersPage = () => {
   const [form] = Form.useForm();
 
   // Dynamic Item Lines State for Create Form
-  const [items, setItems] = useState([{ productId: undefined, quantity: 1, unitPrice: 0, discount: 0 }]);
+  const [items, setItems] = useState([{ key: 'item-0', productId: undefined, quantity: 1, unitPrice: 0, discount: 0 }]);
 
   const fetchOrders = useCallback(async (page = 1, limit = 10, search = '', status = '') => {
     setLoading(true);
+    setError(null);
     try {
       const params = { page, limit };
       if (search) params.search = search;
@@ -105,7 +107,7 @@ const OrdersPage = () => {
       setPagination({ page, limit, total: totalCount });
     } catch (err) {
       console.warn('Fetch orders error:', err);
-      setOrders([]);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -139,8 +141,8 @@ const OrdersPage = () => {
     try {
       await ordersApi.confirm(record.id);
       notification.success({
-        message: 'Xác nhận đơn bán hàng thành công',
-        description: `Đơn bán ${record.orderNumber || record.id} đã chuyển trạng thái CONFIRMED. BE tự động xuất kho và tạo hóa đơn bán.`,
+        title: t('common.success'),
+        description: record.orderNumber || record.id,
       });
       fetchOrders(pagination.page, pagination.limit);
       if (selectedOrder?.id === record.id) {
@@ -148,10 +150,9 @@ const OrdersPage = () => {
       }
     } catch (err) {
       console.error('Confirm order error:', err);
-      const msg = Array.isArray(err?.message) ? err.message.join(', ') : (err?.message || 'Không thể xác nhận đơn');
       notification.error({
-        message: 'Lỗi xác nhận đơn bán',
-        description: msg,
+        title: t('common.error'),
+        description: t('common.error'),
       });
     }
   };
@@ -160,8 +161,8 @@ const OrdersPage = () => {
     try {
       await ordersApi.cancel(record.id);
       notification.info({
-        message: 'Đã hủy đơn bán hàng',
-        description: `Đã hủy đơn bán ${record.orderNumber || record.id}.`,
+        title: t('common.info'),
+        description: record.orderNumber || record.id,
       });
       fetchOrders(pagination.page, pagination.limit);
       if (selectedOrder?.id === record.id) {
@@ -173,8 +174,7 @@ const OrdersPage = () => {
   };
 
   const handleOpenModal = () => {
-    form.resetFields();
-    setItems([{ productId: undefined, quantity: 1, unitPrice: 0, discount: 0 }]);
+    setItems([{ key: `item-${Date.now()}`, productId: undefined, quantity: 1, unitPrice: 0, discount: 0 }]);
     setIsModalOpen(true);
   };
 
@@ -182,7 +182,6 @@ const OrdersPage = () => {
     const newItems = [...items];
     newItems[index][field] = value;
 
-    // Auto fill selling price from product price if available
     if (field === 'productId') {
       const prod = productsList.find((p) => String(p.id) === String(value));
       if (prod && (prod.price || prod.salePrice)) {
@@ -194,7 +193,7 @@ const OrdersPage = () => {
   };
 
   const handleAddItem = () => {
-    setItems([...items, { productId: undefined, quantity: 1, unitPrice: 0, discount: 0 }]);
+    setItems([...items, { key: `item-${Date.now()}-${items.length}`, productId: undefined, quantity: 1, unitPrice: 0, discount: 0 }]);
   };
 
   const handleRemoveItem = (index) => {
@@ -206,7 +205,7 @@ const OrdersPage = () => {
     setSubmitting(true);
     const validItems = items.filter((item) => item.productId && item.quantity > 0);
     if (validItems.length === 0) {
-      notification.warning({ message: 'Vui lòng chọn ít nhất 1 sản phẩm!' });
+      notification.warning({ title: t('common.error') });
       setSubmitting(false);
       return;
     }
@@ -225,17 +224,16 @@ const OrdersPage = () => {
     try {
       await ordersApi.create(payload);
       notification.success({
-        message: 'Tạo đơn bán hàng mới thành công',
-        description: `Đã tạo đơn bán hàng cho khách hàng "${values.customerName}".`,
+        title: t('common.success'),
+        description: values.customerName,
       });
       setIsModalOpen(false);
       fetchOrders(1, pagination.limit);
     } catch (err) {
       console.error('Create order error:', err);
-      const msg = Array.isArray(err?.message) ? err.message.join(', ') : (err?.message || 'Lỗi khi tạo đơn bán');
       notification.error({
-        message: 'Không thể tạo đơn bán hàng',
-        description: msg,
+        title: t('common.error'),
+        description: t('common.error'),
       });
     } finally {
       setSubmitting(false);
@@ -244,7 +242,7 @@ const OrdersPage = () => {
 
   const columns = [
     {
-      title: 'Mã Đơn Bán',
+      title: t('orders.reference'),
       dataIndex: 'orderNumber',
       key: 'orderNumber',
       render: (so, record) => (
@@ -254,81 +252,160 @@ const OrdersPage = () => {
       ),
     },
     {
-      title: 'Tên Khách Hàng',
+      title: t('orders.customer'),
       dataIndex: 'customerName',
       key: 'customerName',
       render: (customer, record) => {
-        const name = customer || record.customer?.name || 'Khách Hàng';
+        const name = customer || record.customer?.name || 'Customer';
         return (
-          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-            <UserOutlined className="text-emerald-600" /> {name}
-          </span>
+          <Tooltip title={name} placement="topLeft">
+            <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 max-w-[220px]">
+              <UserOutlined className="text-emerald-600 flex-shrink-0" />
+              <span className="truncate">{name}</span>
+            </span>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Số Lượng Mặt Hàng',
-      key: 'itemCount',
-      render: (_, record) => {
-        const count = Array.isArray(record.items) ? record.items.length : 1;
-        return <Tag color="blue" className="font-bold">{count} Mặt hàng</Tag>;
-      },
-    },
-    {
-      title: 'Tổng Tiền (VND)',
+      title: t('orders.amount'),
       key: 'totalAmount',
       render: (_, record) => {
         const total = record.totalAmount ?? record.total ?? 0;
         return (
           <span className="font-extrabold text-emerald-600 text-sm font-mono flex items-center gap-1">
-            <DollarOutlined /> {Number(total).toLocaleString('vi-VN')} đ
+            <DollarOutlined /> {Number(total).toLocaleString()} đ
           </span>
         );
       },
     },
     {
-      title: 'Trạng Thái',
+      title: t('orders.status'),
       dataIndex: 'status',
       key: 'status',
-      render: (status) => STATUS_TAGS[status] || <Tag color="default">{status || 'QUOTATION'}</Tag>,
+      render: (status) => <Tag color="purple">{status || 'QUOTATION'}</Tag>,
     },
     {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <Button
-            type="text"
-            icon={<EyeOutlined className="text-indigo-600" />}
-            onClick={() => handleOpenDrawer(record)}
-          >
-            Chi tiết
-          </Button>
-
-          {(record.status === 'CONFIRMED' || record.status === 'DONE') && (
-            <Tooltip title="Tạo Hóa Đơn Bán Hàng Kế Toán">
-              <Button
-                type="text"
-                icon={<FileTextOutlined className="text-indigo-600" />}
-                onClick={() => handleCreateInvoiceFromOrder(record)}
-              />
-            </Tooltip>
-          )}
+          <Tooltip title={t('common.view')}>
+            <Button
+              type="text"
+              size="small"
+              aria-label={t('common.view')}
+              icon={<EyeOutlined className="text-indigo-600" />}
+              onClick={() => handleOpenDrawer(record)}
+            >
+              {t('common.view')}
+            </Button>
+          </Tooltip>
 
           {record.status === 'QUOTATION' && (
             <Popconfirm
-              title="Xác nhận đơn bán hàng này?"
-              description="Hệ thống sẽ tự động xuất kho và sinh hóa đơn bán hàng."
+              title={t('orders.confirmOrder')}
               onConfirm={() => handleConfirmOrder(record)}
-              okText="Xác nhận"
-              cancelText="Hủy"
+              okText={t('common.save')}
+              cancelText={t('common.cancel')}
             >
-              <Button type="primary" size="small" icon={<CheckCircleOutlined />} className="bg-emerald-600 text-xs border-0">
-                Xác nhận
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckCircleOutlined />}
+                aria-label={t('orders.confirmOrder')}
+                className="bg-emerald-600 hover:bg-emerald-500 text-xs border-0 font-bold"
+              >
+                {t('common.save')}
               </Button>
             </Popconfirm>
           )}
         </Space>
+      ),
+    },
+  ];
+
+  const itemColumns = [
+    {
+      title: t('products.name'),
+      dataIndex: 'productId',
+      key: 'productId',
+      render: (val, record, idx) => (
+        <Select
+          placeholder={t('common.select')}
+          value={val}
+          onChange={(v) => handleItemChange(idx, 'productId', v)}
+          showSearch
+          optionFilterProp="label"
+          style={{ width: '100%' }}
+          className="text-xs"
+          options={productsList.map((p) => ({
+            value: p.id,
+            label: `${p.name} (${p.defaultCode || p.brandSku || `ID #${p.id}`})`,
+          }))}
+        />
+      ),
+    },
+    {
+      title: t('orders.quantity'),
+      dataIndex: 'quantity',
+      key: 'quantity',
+      width: 90,
+      render: (val, record, idx) => (
+        <InputNumber
+          min={1}
+          value={val}
+          onChange={(v) => handleItemChange(idx, 'quantity', v)}
+          style={{ width: '100%' }}
+          className="text-xs"
+        />
+      ),
+    },
+    {
+      title: t('products.unitPrice'),
+      dataIndex: 'unitPrice',
+      key: 'unitPrice',
+      width: 155,
+      render: (val, record, idx) => (
+        <CurrencyInputNumber
+          min={0}
+          step={10000}
+          value={val}
+          onChange={(v) => handleItemChange(idx, 'unitPrice', v)}
+          style={{ width: '100%' }}
+          className="text-xs"
+        />
+      ),
+    },
+    {
+      title: t('orders.amount'),
+      key: 'subtotal',
+      width: 130,
+      render: (_, record) => {
+        const sub = Number(record.quantity || 0) * Number(record.unitPrice || 0);
+        const disc = (sub * Number(record.discount || 0)) / 100;
+        return (
+          <span className="font-bold text-slate-800 text-xs font-mono">
+            {(sub - disc).toLocaleString()} đ
+          </span>
+        );
+      },
+    },
+    {
+      title: '',
+      key: 'action',
+      width: 48,
+      render: (_, record, idx) => (
+        <Tooltip title={t('common.delete')}>
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={items.length <= 1}
+            onClick={() => handleRemoveItem(idx)}
+            aria-label={t('common.delete')}
+          />
+        </Tooltip>
       ),
     },
   ];
@@ -340,21 +417,21 @@ const OrdersPage = () => {
   }, 0);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <ShoppingCartOutlined className="text-emerald-600" /> Quản Lý Đơn Bán Hàng & Báo Giá (Sales Orders)
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
+            <ShoppingCartOutlined className="text-emerald-600" /> {t('orders.title')}
           </h2>
-          <Text className="text-slate-500 text-xs mt-1 block">
-            Báo giá khách hàng, xuất kho tự động real-time & tạo hóa đơn bán (`/api/v1/orders`)
+          <Text className="text-slate-500 text-xs mt-0.5 block">
+            {t('orders.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={() => fetchOrders()} loading={loading} className="text-xs font-semibold">
-            Làm mới
+            {t('common.reload')}
           </Button>
           <Button
             type="primary"
@@ -362,17 +439,31 @@ const OrdersPage = () => {
             onClick={handleOpenModal}
             className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
           >
-            Tạo Báo Giá / Đơn Bán
+            {t('orders.createNew')}
           </Button>
         </Space>
       </div>
 
-      {/* Filter & Search Bar */}
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message={t('common.error')}
+          action={
+            <Button size="small" type="primary" danger onClick={() => fetchOrders(pagination.page, pagination.limit, searchText, statusFilter)} loading={loading}>
+              {t('common.reload')}
+            </Button>
+          }
+          className="rounded-xl mb-4"
+        />
+      )}
+
+      {/* Filter & Table Unified Card */}
       <Card className="rounded-xl border-slate-200 shadow-xs">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3 flex-1 max-w-lg">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2 flex-1 max-w-lg">
             <Input
-              placeholder="Tìm theo mã SO hoặc Tên Khách Hàng..."
+              placeholder={t('orders.searchPlaceholder')}
               prefix={<SearchOutlined className="text-slate-400" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -381,26 +472,26 @@ const OrdersPage = () => {
               className="rounded-xl flex-1 text-xs"
             />
             <Button onClick={handleSearch} type="primary" className="bg-indigo-600 text-xs font-bold border-0">
-              Tìm kiếm
+              {t('common.search')}
             </Button>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600">Trạng thái:</span>
+            <span className="text-xs font-bold text-slate-600">{t('common.filter')}:</span>
             <Select
               value={statusFilter}
               onChange={(val) => {
                 setStatusFilter(val);
                 fetchOrders(1, pagination.limit, searchText, val);
               }}
-              style={{ width: 180 }}
+              style={{ width: 170 }}
               options={[
-                { value: '', label: 'Tất cả trạng thái' },
-                { value: 'QUOTATION', label: 'Báo giá (QUOTATION)' },
-                { value: 'CONFIRMED', label: 'Đã xác nhận (CONFIRMED)' },
-                { value: 'SHIPPED', label: 'Đang giao (SHIPPED)' },
-                { value: 'DONE', label: 'Hoàn thành (DONE)' },
-                { value: 'CANCELLED', label: 'Đã hủy (CANCELLED)' },
+                { value: '', label: t('common.all') },
+                { value: 'QUOTATION', label: 'QUOTATION' },
+                { value: 'CONFIRMED', label: 'CONFIRMED' },
+                { value: 'SHIPPED', label: 'SHIPPED' },
+                { value: 'DONE', label: 'DONE' },
+                { value: 'CANCELLED', label: 'CANCELLED' },
               ]}
               className="text-xs"
             />
@@ -408,17 +499,30 @@ const OrdersPage = () => {
         </div>
 
         <Table
+          size="middle"
           columns={columns}
           dataSource={orders}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
+          locale={{
+            emptyText: (
+              <div className="py-8 text-center">
+                <ShoppingCartOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleOpenModal} className="bg-indigo-600 border-0 text-xs mt-3">
+                  {t('orders.createNew')}
+                </Button>
+              </div>
+            ),
+          }}
           pagination={{
             current: pagination.page,
             pageSize: pagination.limit,
             total: pagination.total,
             onChange: (p, l) => fetchOrders(p, l),
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} đơn bán`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
         />
       </Card>
@@ -428,29 +532,29 @@ const OrdersPage = () => {
         title={
           <span className="font-bold text-slate-900 flex items-center gap-2">
             <FileTextOutlined className="text-emerald-600" />
-            Chi Tiết Đơn Bán Hàng #{selectedOrder?.orderNumber || selectedOrder?.id}
+            #{selectedOrder?.orderNumber || selectedOrder?.id}
           </span>
         }
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={620}
+        styles={{ wrapper: { width: 620 } }}
       >
         {selectedOrder && (
           <div className="flex flex-col gap-5 text-xs">
             <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div>
-                <div className="text-slate-500 font-semibold">Tên Khách Hàng</div>
-                <div className="font-extrabold text-slate-900 text-sm mt-0.5">{selectedOrder.customerName || 'Khách hàng'}</div>
+                <div className="text-slate-500 font-semibold">{t('orders.customer')}</div>
+                <div className="font-extrabold text-slate-900 text-sm mt-0.5">{selectedOrder.customerName || 'Customer'}</div>
               </div>
               <div>
-                <div className="text-slate-500 font-semibold">Trạng Thái</div>
-                <div className="mt-0.5">{STATUS_TAGS[selectedOrder.status] || <Tag>{selectedOrder.status}</Tag>}</div>
+                <div className="text-slate-500 font-semibold">{t('orders.status')}</div>
+                <div className="mt-0.5"><Tag>{selectedOrder.status}</Tag></div>
               </div>
             </div>
 
             <Divider className="my-1" />
 
-            <div className="font-bold text-slate-800 text-sm">Danh Sách Phụ Tùng Bán Hàng:</div>
+            <div className="font-bold text-slate-800 text-sm">{t('products.title')}:</div>
             <Table
               dataSource={selectedOrder.items || []}
               rowKey={(item) => item.id || item.productId}
@@ -458,65 +562,48 @@ const OrdersPage = () => {
               size="small"
               columns={[
                 {
-                  title: 'Phụ Tùng',
+                  title: t('products.name'),
                   key: 'name',
-                  render: (_, r) => r.product?.name || r.productName || `Sản phẩm #${r.productId}`,
+                  render: (_, r) => r.product?.name || r.productName || `#${r.productId}`,
                 },
-                { title: 'Số Lượng', dataIndex: 'quantity', key: 'quantity', width: 80 },
                 {
-                  title: 'Đơn Giá (VND)',
+                  title: t('orders.quantity'),
+                  dataIndex: 'quantity',
+                  key: 'quantity',
+                  width: 80,
+                  render: (q) => <span className="font-mono tabular-nums font-semibold text-slate-800">{q}</span>,
+                },
+                {
+                  title: t('products.unitPrice'),
                   dataIndex: 'unitPrice',
                   key: 'unitPrice',
-                  render: (p) => `${Number(p || 0).toLocaleString('vi-VN')} đ`,
+                  render: (p) => <span className="font-mono tabular-nums font-medium text-slate-700">{Number(p || 0).toLocaleString()} đ</span>,
                 },
                 {
-                  title: 'Chiết Khấu',
-                  dataIndex: 'discount',
-                  key: 'discount',
-                  render: (d) => `${d || 0}%`,
-                },
-                {
-                  title: 'Thành Tiền',
+                  title: t('orders.amount'),
                   key: 'subtotal',
                   render: (_, r) => {
                     const sub = Number(r.quantity || 0) * Number(r.unitPrice || 0);
                     const disc = (sub * Number(r.discount || 0)) / 100;
-                    return `${(sub - disc).toLocaleString('vi-VN')} đ`;
+                    return (
+                      <span className="font-mono tabular-nums font-bold text-slate-900">
+                        {(sub - disc).toLocaleString()} đ
+                      </span>
+                    );
                   },
                 },
               ]}
             />
 
             <div className="flex justify-end items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100 mt-2">
-              <span className="font-bold text-slate-700">Tổng Thanh Toán:</span>
-              <span className="font-black text-emerald-700 text-base font-mono">
-                {Number(selectedOrder.totalAmount || selectedOrder.total || 0).toLocaleString('vi-VN')} đ
+              <span className="font-bold text-slate-700">Total:</span>
+              <span className="font-black text-emerald-700 text-base font-mono tabular-nums">
+                {Number(selectedOrder.totalAmount || selectedOrder.total || 0).toLocaleString()} đ
               </span>
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
-              {(selectedOrder.status === 'CONFIRMED' || selectedOrder.status === 'DONE') && (
-                <Button
-                  type="default"
-                  icon={<FileTextOutlined className="text-indigo-600" />}
-                  loading={creatingInvoice}
-                  onClick={() => handleCreateInvoiceFromOrder(selectedOrder)}
-                  className="border-indigo-300 text-indigo-700 bg-indigo-50/50 font-bold"
-                >
-                  Tạo Hóa Đơn Bán Hàng
-                </Button>
-              )}
-
-              {selectedOrder.status === 'QUOTATION' && (
-                <>
-                  <Button danger icon={<CloseCircleOutlined />} onClick={() => handleCancelOrder(selectedOrder)}>
-                    Hủy Báo Giá
-                  </Button>
-                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => handleConfirmOrder(selectedOrder)} className="bg-emerald-600 border-0">
-                    Xác Nhận Bán & Xuất Kho
-                  </Button>
-                </>
-              )}
+              <Button onClick={() => setDrawerOpen(false)}>{t('common.cancel')}</Button>
             </div>
           </div>
         )}
@@ -524,112 +611,60 @@ const OrdersPage = () => {
 
       {/* Create Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">Tạo Báo Giá / Đơn Bán Hàng Mới</span>}
+        title={<span className="font-bold text-slate-900">{t('orders.createNew')}</span>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         destroyOnHidden
-        width={750}
+        width={800}
       >
         <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
           <Form.Item
-            label="Tên Khách Hàng / Đối Tác Mua"
+            label={t('orders.customer')}
             name="customerName"
-            rules={[{ required: true, message: 'Nhập tên khách hàng!' }]}
+            rules={[{ required: true, message: t('common.required') }]}
           >
-            <Input placeholder="Công ty Vận Tải A, Khách hàng B..." />
+            <Input placeholder="Customer Name" />
           </Form.Item>
 
-          <Form.Item label="Trạng Thái Bán Khởi Tạo" name="status" initialValue="QUOTATION">
+          <Form.Item label={t('orders.status')} name="status" initialValue="QUOTATION">
             <Select
               options={[
-                { value: 'QUOTATION', label: 'Báo Giá QUOTATION (Chưa xuất kho)' },
-                { value: 'CONFIRMED', label: 'Xác Nhận CONFIRMED (Tự động Xuất Kho)' },
+                { value: 'QUOTATION', label: 'QUOTATION' },
+                { value: 'CONFIRMED', label: 'CONFIRMED' },
               ]}
             />
           </Form.Item>
 
-          <Divider className="my-2">Danh Sách Phụ Tùng Bán Hàng</Divider>
+          <Divider className="my-2">{t('products.title')}</Divider>
 
-          {items.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2 mb-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex-1">
-                <div className="text-[11px] font-bold text-slate-600 mb-1">Sản Phẩm Phụ Tùng #{idx + 1}</div>
-                <Select
-                  placeholder="Chọn sản phẩm..."
-                  value={item.productId}
-                  onChange={(val) => handleItemChange(idx, 'productId', val)}
-                  showSearch
-                  optionFilterProp="label"
-                  style={{ width: '100%' }}
-                  options={productsList.map((p) => ({
-                    value: p.id,
-                    label: `${p.name} (${p.defaultCode || p.brandSku || `ID #${p.id}`})`,
-                  }))}
-                />
-              </div>
-
-              <div className="w-20">
-                <div className="text-[11px] font-bold text-slate-600 mb-1">Số Lượng</div>
-                <InputNumber
-                  min={1}
-                  value={item.quantity}
-                  onChange={(val) => handleItemChange(idx, 'quantity', val)}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div className="w-28">
-                <div className="text-[11px] font-bold text-slate-600 mb-1">Giá Bán (VND)</div>
-                <InputNumber
-                  min={0}
-                  step={10000}
-                  value={item.unitPrice}
-                  onChange={(val) => handleItemChange(idx, 'unitPrice', val)}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div className="w-20">
-                <div className="text-[11px] font-bold text-slate-600 mb-1">CK (%)</div>
-                <InputNumber
-                  min={0}
-                  max={100}
-                  value={item.discount}
-                  onChange={(val) => handleItemChange(idx, 'discount', val)}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div className="pt-5">
-                <Tooltip title="Xóa dòng này">
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    disabled={items.length <= 1}
-                    onClick={() => handleRemoveItem(idx)}
-                  />
-                </Tooltip>
-              </div>
-            </div>
-          ))}
+          <Table
+            tableLayout="fixed"
+            dataSource={items}
+            columns={itemColumns}
+            pagination={false}
+            size="small"
+            bordered
+            rowKey={(record) => record.key || record.id || record.productId}
+            scroll={{ x: 680 }}
+            className="mb-3"
+          />
 
           <Button type="dashed" block icon={<PlusOutlined />} onClick={handleAddItem} className="mb-4">
-            Thêm Phụ Tùng Bán
+            {t('orders.createNew')}
           </Button>
 
           <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-xl mb-4">
-            <span className="font-bold text-slate-700 text-xs">Tổng Tiền Báo Giá:</span>
+            <span className="font-bold text-slate-700 text-xs">Total:</span>
             <span className="font-black text-emerald-700 text-base font-mono">
-              {totalModalAmount.toLocaleString('vi-VN')} đ
+              {totalModalAmount.toLocaleString()} đ
             </span>
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={submitting} className="bg-emerald-600 font-bold border-0">
-              Tạo Đơn Bán Hàng
+              {t('common.save')}
             </Button>
           </div>
         </Form>

@@ -14,7 +14,9 @@ import {
   InputNumber,
   notification,
   Avatar,
-  Image
+  Image,
+  Tooltip,
+  Alert
 } from 'antd';
 import {
   InboxOutlined,
@@ -28,28 +30,26 @@ import {
   SwapOutlined,
   BoxPlotOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { inventoryApi, productsApi } from '../api/modulesApi';
 import { resolveUrl } from '../utils/resolveUrl';
 
 const { Title, Text } = Typography;
 
-const MOVE_TYPE_TAGS = {
-  IN: <Tag color="green" icon={<ArrowDownOutlined />} className="font-bold">Nhập Kho (IN)</Tag>,
-  OUT: <Tag color="red" icon={<ArrowUpOutlined />} className="font-bold">Xuất Kho (OUT)</Tag>,
-  ADJUSTMENT: <Tag color="gold" icon={<SwapOutlined />} className="font-bold">Điều Chỉnh (ADJUST)</Tag>,
-};
-
 const InventoryPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('moves');
 
   // Stock moves state (Tab 1)
   const [moves, setMoves] = useState([]);
   const [movesLoading, setMovesLoading] = useState(false);
+  const [movesError, setMovesError] = useState(null);
   const [movesSearch, setMovesSearch] = useState('');
 
   // Products stock state (Tab 2)
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState(null);
   const [prodSearch, setProdSearch] = useState('');
 
   // Adjustment Modal state
@@ -59,6 +59,7 @@ const InventoryPage = () => {
 
   const fetchStockMoves = async () => {
     setMovesLoading(true);
+    setMovesError(null);
     try {
       const res = await inventoryApi.getStockMoves();
       const data = res?.data || res;
@@ -69,7 +70,7 @@ const InventoryPage = () => {
       }
     } catch (err) {
       console.warn('Fetch stock moves error:', err);
-      setMoves([]);
+      setMovesError(err);
     } finally {
       setMovesLoading(false);
     }
@@ -77,6 +78,7 @@ const InventoryPage = () => {
 
   const fetchProductsStock = async () => {
     setProductsLoading(true);
+    setProductsError(null);
     try {
       const res = await productsApi.getAll();
       const data = res?.data || res;
@@ -87,7 +89,7 @@ const InventoryPage = () => {
       }
     } catch (err) {
       console.warn('Fetch products stock error:', err);
-      setProducts([]);
+      setProductsError(err);
     } finally {
       setProductsLoading(false);
     }
@@ -114,24 +116,23 @@ const InventoryPage = () => {
     const payload = {
       productId: Number(values.productId),
       actualStock: Number(values.actualStock),
-      note: values.note || 'Kiểm kê định kỳ kho phụ tùng',
+      note: values.note || 'Inventory Adjustment',
     };
 
     try {
       await inventoryApi.adjustStock(payload);
       notification.success({
-        message: 'Điều chỉnh kho thành công',
-        description: `Đã cập nhật số dư tồn kho thực tế cho sản phẩm #${values.productId}.`,
+        message: t('common.success'),
+        description: `#${values.productId}`,
       });
       setIsAdjustModalOpen(false);
       fetchStockMoves();
       fetchProductsStock();
     } catch (err) {
       console.error('Adjust stock error:', err);
-      const msg = Array.isArray(err?.message) ? err.message.join(', ') : (err?.message || 'Không thể điều chỉnh tồn kho');
       notification.error({
-        message: 'Lỗi điều chỉnh tồn kho',
-        description: msg,
+        message: t('common.error'),
+        description: t('common.error'),
       });
     } finally {
       setAdjustSubmitting(false);
@@ -147,24 +148,24 @@ const InventoryPage = () => {
 
   const filteredProducts = products.filter(
     (p) =>
-      p.name.toLowerCase().includes(prodSearch.toLowerCase()) ||
+      (p.name || '').toLowerCase().includes(prodSearch.toLowerCase()) ||
       (p.defaultCode && p.defaultCode.toLowerCase().includes(prodSearch.toLowerCase())) ||
       (p.brandSku && p.brandSku.toLowerCase().includes(prodSearch.toLowerCase()))
   );
 
   const movesColumns = [
     {
-      title: 'Thời Gian',
+      title: t('common.createdAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date) => (
         <span className="font-mono text-slate-500 text-xs font-semibold">
-          {date ? new Date(date).toLocaleString('vi-VN') : '29/08/2026 12:00'}
+          {date ? new Date(date).toLocaleString() : ''}
         </span>
       ),
     },
     {
-      title: 'Mã Tham Chiếu',
+      title: t('inventory.reference'),
       dataIndex: 'reference',
       key: 'reference',
       render: (ref, r) => (
@@ -174,22 +175,27 @@ const InventoryPage = () => {
       ),
     },
     {
-      title: 'Loại Biến Động',
+      title: t('inventory.type'),
       dataIndex: 'type',
       key: 'type',
-      render: (type) => MOVE_TYPE_TAGS[type] || <Tag color="default">{type || 'ADJUSTMENT'}</Tag>,
+      render: (type) => <Tag color={type === 'IN' ? 'green' : type === 'OUT' ? 'red' : 'gold'} className="font-bold">{type}</Tag>,
     },
     {
-      title: 'Phụ Tùng / Sản Phẩm',
+      title: t('products.name'),
       key: 'productName',
-      render: (_, r) => (
-        <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-          {r.productName || r.product?.name || `Sản phẩm #${r.productId}`}
-        </span>
-      ),
+      render: (_, r) => {
+        const name = r.productName || r.product?.name || `#${r.productId}`;
+        return (
+          <Tooltip title={name} placement="topLeft">
+            <span className="font-bold text-slate-800 text-xs truncate block max-w-[220px]">
+              {name}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
-      title: 'Số Lượng Biến Động',
+      title: t('inventory.quantity'),
       dataIndex: 'quantity',
       key: 'quantity',
       render: (qty, r) => {
@@ -202,17 +208,11 @@ const InventoryPage = () => {
         );
       },
     },
-    {
-      title: 'Ghi Chú',
-      dataIndex: 'note',
-      key: 'note',
-      render: (note) => <span className="text-slate-600 text-xs italic">{note || 'N/A'}</span>,
-    },
   ];
 
   const productsStockColumns = [
     {
-      title: 'Hình Ảnh',
+      title: t('common.image'),
       dataIndex: 'imageUrl',
       key: 'imageUrl',
       width: 70,
@@ -239,28 +239,32 @@ const InventoryPage = () => {
       },
     },
     {
-      title: 'Tên Phụ Tùng',
+      title: t('products.name'),
       dataIndex: 'name',
       key: 'name',
-      render: (name) => <span className="font-bold text-slate-900 text-xs">{name}</span>,
+      render: (name) => (
+        <Tooltip title={name} placement="topLeft">
+          <span className="font-bold text-slate-900 text-xs truncate block max-w-[240px]">{name}</span>
+        </Tooltip>
+      ),
     },
     {
-      title: 'Mã Barcode',
+      title: t('products.code'),
       dataIndex: 'defaultCode',
       key: 'defaultCode',
       render: (code) => <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded text-[11px] font-mono font-bold">{code || 'N/A'}</code>,
     },
     {
-      title: 'Tồn Kho Hiện Tại',
+      title: t('inventory.quantity'),
       key: 'stock',
       render: (_, r) => {
         const qty = r.qtyAvailable ?? r.stock ?? r.quantity ?? 0;
         const color = qty > 10 ? 'green' : (qty > 0 ? 'gold' : 'red');
-        return <Tag color={color} className="font-black text-xs">{qty} Sản phẩm</Tag>;
+        return <Tag color={color} className="font-black text-xs">{qty}</Tag>;
       },
     },
     {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Button
@@ -270,28 +274,28 @@ const InventoryPage = () => {
           onClick={() => handleOpenAdjustModal(record)}
           className="bg-amber-600 hover:bg-amber-500 font-bold text-xs border-0"
         >
-          Kiểm Kê Kho
+          {t('inventory.adjustStock')}
         </Button>
       ),
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <InboxOutlined className="text-indigo-600" /> Quản Lý Kho & Tồn Kho Real-time (Inventory)
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
+            <InboxOutlined className="text-indigo-600" /> {t('inventory.title')}
           </h2>
-          <Text className="text-slate-500 text-xs mt-1 block">
-            Nhật ký biến động kho (Audit Trail) & Kiểm kê điều chỉnh số dư kho thực tế (`/api/v1/inventory`)
+          <Text className="text-slate-500 text-xs mt-0.5 block">
+            {t('inventory.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={() => { fetchStockMoves(); fetchProductsStock(); }} className="text-xs font-semibold">
-            Làm mới kho
+            {t('common.reload')}
           </Button>
           <Button
             type="primary"
@@ -299,7 +303,7 @@ const InventoryPage = () => {
             onClick={() => handleOpenAdjustModal()}
             className="bg-amber-600 hover:bg-amber-500 font-bold shadow-sm shadow-amber-100 text-xs border-0"
           >
-            Kiểm Kê Điều Chỉnh Kho
+            {t('inventory.adjustStock')}
           </Button>
         </Space>
       </div>
@@ -314,14 +318,27 @@ const InventoryPage = () => {
               key: 'moves',
               label: (
                 <span className="font-bold text-xs flex items-center gap-1.5">
-                  <HistoryOutlined /> Nhật Ký Biến Động Kho (Audit Trail)
+                  <HistoryOutlined /> {t('inventory.moves')}
                 </span>
               ),
               children: (
-                <div className="flex flex-col gap-4 mt-2">
-                  <div className="max-w-sm">
+                <div className="flex flex-col gap-3 mt-1">
+                  {movesError && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      message={t('common.error')}
+                      action={
+                        <Button size="small" type="primary" danger onClick={fetchStockMoves} loading={movesLoading}>
+                          {t('common.reload')}
+                        </Button>
+                      }
+                      className="rounded-xl mb-2"
+                    />
+                  )}
+                  <div className="max-w-md">
                     <Input
-                      placeholder="Tìm theo mã tham chiếu hoặc tên phụ tùng..."
+                      placeholder={t('inventory.searchPlaceholder')}
                       prefix={<SearchOutlined className="text-slate-400" />}
                       value={movesSearch}
                       onChange={(e) => setMovesSearch(e.target.value)}
@@ -331,15 +348,25 @@ const InventoryPage = () => {
                   </div>
 
                   <Table
+                    size="middle"
                     columns={movesColumns}
                     dataSource={filteredMoves}
                     rowKey={(r) => r.id || r.reference}
                     loading={movesLoading}
+                    scroll={{ x: 'max-content' }}
+                    locale={{
+                      emptyText: (
+                        <div className="py-8 text-center">
+                          <HistoryOutlined className="text-slate-300 text-3xl mb-2" />
+                          <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                        </div>
+                      ),
+                    }}
                     pagination={{
                       defaultPageSize: 10,
                       pageSizeOptions: ['10', '20', '50'],
                       showSizeChanger: true,
-                      showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} biến động`,
+                      showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
                     }}
                   />
                 </div>
@@ -349,14 +376,27 @@ const InventoryPage = () => {
               key: 'products',
               label: (
                 <span className="font-bold text-xs flex items-center gap-1.5">
-                  <BoxPlotOutlined /> Kiểm Kê & Tồn Kho Thực Tế
+                  <BoxPlotOutlined /> {t('inventory.title')}
                 </span>
               ),
               children: (
-                <div className="flex flex-col gap-4 mt-2">
-                  <div className="max-w-sm">
+                <div className="flex flex-col gap-3 mt-1">
+                  {productsError && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      message={t('common.error')}
+                      action={
+                        <Button size="small" type="primary" danger onClick={fetchProductsStock} loading={productsLoading}>
+                          {t('common.reload')}
+                        </Button>
+                      }
+                      className="rounded-xl mb-2"
+                    />
+                  )}
+                  <div className="max-w-md">
                     <Input
-                      placeholder="Tìm theo tên phụ tùng hoặc mã barcode..."
+                      placeholder={t('inventory.searchPlaceholder')}
                       prefix={<SearchOutlined className="text-slate-400" />}
                       value={prodSearch}
                       onChange={(e) => setProdSearch(e.target.value)}
@@ -366,15 +406,25 @@ const InventoryPage = () => {
                   </div>
 
                   <Table
+                    size="middle"
                     columns={productsStockColumns}
                     dataSource={filteredProducts}
                     rowKey="id"
                     loading={productsLoading}
+                    scroll={{ x: 'max-content' }}
+                    locale={{
+                      emptyText: (
+                        <div className="py-8 text-center">
+                          <InboxOutlined className="text-slate-300 text-3xl mb-2" />
+                          <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                        </div>
+                      ),
+                    }}
                     pagination={{
                       defaultPageSize: 10,
                       pageSizeOptions: ['10', '20', '50'],
                       showSizeChanger: true,
-                      showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} phụ tùng`,
+                      showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
                     }}
                   />
                 </div>
@@ -386,21 +436,21 @@ const InventoryPage = () => {
 
       {/* Stock Adjustment Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">Kiểm Kê & Điều Chỉnh Tồn Kho Thực Tế</span>}
+        title={<span className="font-bold text-slate-900">{t('inventory.adjustStock')}</span>}
         open={isAdjustModalOpen}
         onCancel={() => setIsAdjustModalOpen(false)}
         footer={null}
         destroyOnHidden
-        width={500}
+        width={480}
       >
         <Form form={form} layout="vertical" onFinish={handleAdjustStock} className="mt-4">
           <Form.Item
-            label="Phụ Tùng Kiểm Kê"
+            label={t('products.name')}
             name="productId"
-            rules={[{ required: true, message: 'Vui lòng chọn phụ tùng!' }]}
+            rules={[{ required: true, message: t('common.required') }]}
           >
             <Select
-              placeholder="Chọn phụ tùng từ hệ thống..."
+              placeholder={t('common.select')}
               showSearch
               optionFilterProp="label"
               options={products.map((p) => ({
@@ -411,25 +461,21 @@ const InventoryPage = () => {
           </Form.Item>
 
           <Form.Item
-            label="Số Lượng Tồn Kho Thực Tế Đếm Được"
+            label={t('inventory.quantity')}
             name="actualStock"
-            rules={[{ required: true, message: 'Nhập số lượng tồn kho đếm được!' }]}
+            rules={[{ required: true, message: t('common.required') }]}
           >
             <InputNumber
               style={{ width: '100%' }}
               min={0}
-              placeholder="VD: 50"
+              placeholder="0"
             />
           </Form.Item>
 
-          <Form.Item label="Ghi Chú Lý Do Điều Chỉnh" name="note" initialValue="Kiểm kê kho định kỳ">
-            <Input.TextArea rows={2} placeholder="Nhập ghi chú lý do chênh lệch tồn kho..." />
-          </Form.Item>
-
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsAdjustModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsAdjustModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={adjustSubmitting} className="bg-amber-600 font-bold border-0">
-              Cập Nhật Số Dư Kho
+              {t('common.save')}
             </Button>
           </div>
         </Form>

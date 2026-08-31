@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 /* Fix 1: Ant Design Sider inner container flexbox fix */
@@ -15,6 +15,7 @@
   border-bottom: 1px solid #e2e8f0 !important;
   line-height: normal !important;
   padding: 0 24px !important;
+  z-index: 30 !important;
 }
 
 /* Fix 3: Ant Design SVG Icon display reset from Tailwind v4 Preflight */
@@ -60,7 +61,7 @@ body {
   padding: 0;
   background-color: #f8fafc;
   color: #334155;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -108,6 +109,53 @@ body {
 .ant-input-number,
 .ant-input-number-group-wrapper {
   width: 100% !important;
+}
+
+/* Fix 8: Global Responsive Table Scroll Container */
+.ant-table-wrapper {
+  max-width: 100% !important;
+  overflow-x: auto;
+}
+
+/* Fix 9: Ant Design Select selection item truncation to prevent column width expansion */
+.ant-table-cell .ant-select,
+.ant-select-single {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.ant-table-cell .ant-select .ant-select-selector,
+.ant-select-single .ant-select-selector {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+}
+
+.ant-table-cell .ant-select .ant-select-selection-item,
+.ant-select-single .ant-select-selector .ant-select-selection-item {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Fix 10: Sidebar Menu Group Titles Styling */
+.ant-menu-item-group-title {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  padding: 12px 12px 4px 12px !important;
+  text-transform: uppercase;
+}
+
+.ant-menu-item-group:first-child .ant-menu-item-group-title {
+  padding-top: 4px !important;
 }
 
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, InputNumber, Select, Avatar, Image, notification } from 'antd';
+import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, InputNumber, Select, Avatar, Image, Tooltip, notification } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, ShopOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { supplierInfoApi, productsApi } from '../api/modulesApi';
 import ImageUploadInput from '../components/ImageUploadInput';
 import { resolveUrl } from '../utils/resolveUrl';
@@ -8,6 +9,7 @@ import { resolveUrl } from '../utils/resolveUrl';
 const { Title, Text } = Typography;
 
 const IsolatedSearchBar = React.memo(({ onSearch }) => {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
 
   const handleTriggerSearch = () => {
@@ -17,7 +19,7 @@ const IsolatedSearchBar = React.memo(({ onSearch }) => {
   return (
     <div className="mb-4 flex items-center gap-3 max-w-md">
       <Input
-        placeholder="Tìm theo tên nhà cung cấp hoặc mã phụ tùng riêng..."
+        placeholder={t('suppliers.searchPlaceholder')}
         prefix={<SearchOutlined className="text-slate-400" />}
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -27,13 +29,14 @@ const IsolatedSearchBar = React.memo(({ onSearch }) => {
         className="rounded-xl text-xs flex-1"
       />
       <Button onClick={handleTriggerSearch} type="primary" className="bg-indigo-600 font-bold text-xs border-0">
-        Tìm kiếm
+        {t('common.search')}
       </Button>
     </div>
   );
 });
 
 const SupplierInfoPage = () => {
+  const { t } = useTranslation();
   const [suppliers, setSuppliers] = useState([]);
   const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -91,7 +94,7 @@ const SupplierInfoPage = () => {
   const productOptions = useMemo(() => {
     return productsList.map((p) => ({
       value: p.id,
-      label: `${p.name || p.title || 'Phụ tùng'} (${p.defaultCode || p.code || p.sku || `ID #${p.id}`})`,
+      label: `${p.name || p.title || 'Product'} (${p.defaultCode || p.code || p.sku || `ID #${p.id}`})`,
     }));
   }, [productsList]);
 
@@ -117,7 +120,7 @@ const SupplierInfoPage = () => {
   const handleSave = async (values) => {
     setSubmitting(true);
     const selectedProd = productsList.find((p) => String(p.id) === String(values.productId));
-    const prodName = selectedProd?.name || selectedProd?.title || 'Phụ tùng';
+    const prodName = selectedProd?.name || selectedProd?.title || 'Product';
 
     const payload = {};
     if (values.productId !== undefined && values.productId !== null) payload.productId = Number(values.productId);
@@ -132,8 +135,8 @@ const SupplierInfoPage = () => {
         await supplierInfoApi.update(editingSupplier.id, payload);
         setSuppliers(suppliers.map((s) => (s.id === editingSupplier.id ? { ...s, ...payload, productName: prodName } : s)));
         notification.success({
-          message: 'Cập nhật nhà cung cấp thành công',
-          description: `Đã cập nhật thông tin nhà cung cấp "${values.supplierName}".`,
+          message: t('common.success'),
+          description: values.supplierName,
         });
       } else {
         const res = await supplierInfoApi.create(payload);
@@ -146,20 +149,16 @@ const SupplierInfoPage = () => {
         };
         setSuppliers([newSupplier, ...suppliers]);
         notification.success({
-          message: 'Thêm nhà cung cấp mới thành công',
-          description: `Đã thêm nhà cung cấp "${values.supplierName}" với mã hàng ${values.productCode}.`,
+          message: t('common.success'),
+          description: values.supplierName,
         });
       }
       setIsModalOpen(false);
     } catch (err) {
-      console.error('Save supplier API error details:', err, 'Message Array:', err?.message);
-      const msgArray = Array.isArray(err?.message) ? err.message : (typeof err?.message === 'string' ? [err.message] : [JSON.stringify(err)]);
-      const errorText = msgArray.join(' | ');
-
+      console.error('Save supplier API error details:', err);
       notification.error({
-        message: 'Lỗi Backend (400 Bad Request)',
-        description: `Chi tiết lỗi từ BE: ${errorText}`,
-        duration: 12,
+        message: t('common.error'),
+        description: t('common.error'),
       });
     } finally {
       setSubmitting(false);
@@ -168,7 +167,7 @@ const SupplierInfoPage = () => {
 
   const handleDelete = useCallback(async (record) => {
     const targetId = typeof record === 'object' ? record.id : record;
-    const targetName = typeof record === 'object' ? (record.supplierName || record.name) : 'nhà cung cấp';
+    const targetName = typeof record === 'object' ? (record.supplierName || record.name) : '';
     try {
       await supplierInfoApi.delete(targetId);
     } catch (err) {
@@ -176,11 +175,11 @@ const SupplierInfoPage = () => {
     } finally {
       setSuppliers((prev) => prev.filter((s) => s.id !== targetId));
       notification.info({
-        message: 'Xóa nhà cung cấp thành công',
-        description: `Đã xóa thông tin nhà cung cấp "${targetName}".`,
+        message: t('common.info'),
+        description: targetName,
       });
     }
-  }, []);
+  }, [t]);
 
   const handleSearchTrigger = useCallback((text) => {
     setCurrentSearch(text);
@@ -189,76 +188,74 @@ const SupplierInfoPage = () => {
 
   const columns = useMemo(() => [
     {
-      title: 'Tên Nhà Cung Cấp',
+      title: t('suppliers.name'),
       key: 'supplierName',
       render: (_, record) => {
-        const name = record.supplierName || record.name || record.supplier?.name || 'Nhà cung cấp';
+        const name = record.supplierName || record.name || record.supplier?.name || 'Supplier';
         const src = resolveUrl(record.logoUrl || record.imageUrl);
         const initialLetter = (name || 'S')[0].toUpperCase();
 
         return (
-          <div className="flex items-center gap-2.5">
-            <Avatar
-              src={src}
-              size={32}
-              className="border border-slate-200 bg-emerald-50 text-emerald-700 font-extrabold text-xs shrink-0 shadow-2xs flex items-center justify-center"
-            >
-              {initialLetter}
-            </Avatar>
-            <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-              {name}
-            </span>
-          </div>
+          <Tooltip title={name} placement="topLeft">
+            <div className="flex items-center gap-2.5 max-w-[220px]">
+              <Avatar
+                src={src}
+                size={32}
+                className="border border-slate-200 bg-emerald-50 text-emerald-700 font-extrabold text-xs shrink-0 shadow-2xs flex items-center justify-center"
+              >
+                {initialLetter}
+              </Avatar>
+              <span className="font-bold text-slate-900 text-sm truncate">
+                {name}
+              </span>
+            </div>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Sản Phẩm Liên Kết',
+      title: t('products.title'),
       key: 'product',
       render: (_, record) => {
-        const prodName = record.product?.name || record.productName || (record.productId ? `Sản phẩm #${record.productId}` : 'Chưa chọn');
+        const prodName = record.product?.name || record.productName || (record.productId ? `#${record.productId}` : 'N/A');
         const prodCode = record.productCode || record.supplierProductCode || record.code || record.product?.code || 'N/A';
         return (
           <div className="text-xs">
             <span className="font-semibold text-slate-800">{prodName}</span>
-            <div className="text-[11px] text-slate-500 font-mono">Mã NCC: {prodCode}</div>
+            <div className="text-[11px] text-slate-500 font-mono">{t('suppliers.code')}: {prodCode}</div>
           </div>
         );
       },
     },
     {
-      title: 'Giá Nhập (VND)',
+      title: t('products.costPrice'),
       key: 'price',
       render: (_, record) => {
         const price = record.price ?? record.unitPrice ?? record.costPrice ?? 0;
         return (
           <span className="font-bold text-emerald-600 text-sm flex items-center gap-1 font-mono">
-            <DollarOutlined /> {Number(price).toLocaleString('vi-VN')} đ
+            <DollarOutlined /> {Number(price).toLocaleString()} đ
           </span>
         );
       },
     },
     {
-      title: 'Số Lượng Tối Thiểu (Min Qty)',
-      key: 'minQty',
-      render: (_, record) => {
-        const qty = record.minQty ?? record.minQuantity ?? record.minimumQuantity ?? 1;
-        return <Tag color="blue" className="font-bold">{qty} Sản phẩm</Tag>;
-      },
-    },
-    {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
-          <Popconfirm title="Xóa thông tin nhà cung cấp này?" onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
-            <Button type="text" danger icon={<DeleteOutlined />} />
+          <Tooltip title={t('common.edit')}>
+            <Button type="text" size="small" aria-label={t('common.edit')} icon={<EditOutlined className="text-indigo-600" />} onClick={() => handleOpenModal(record)} />
+          </Tooltip>
+          <Popconfirm title={t('suppliers.deleteConfirm')} onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
+            <Tooltip title={t('common.delete')}>
+              <Button type="text" danger size="small" aria-label={t('common.delete')} icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
     },
-  ], [handleOpenModal, handleDelete]);
+  ], [handleOpenModal, handleDelete, t]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -266,16 +263,16 @@ const SupplierInfoPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <ShopOutlined className="text-emerald-600" /> Quản Lý Nhà Cung Cấp (Supplier Info)
+            <ShopOutlined className="text-emerald-600" /> {t('suppliers.title')}
           </h2>
           <Text className="text-slate-500 text-xs mt-1 block">
-            Thông tin mã hàng riêng, giá nhập mua & số lượng tối thiểu từ Nhà cung cấp (`/api/v1/supplier-info`)
+            {t('suppliers.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={() => fetchSuppliers(pagination.page, pagination.limit, currentSearch)} loading={loading} className="text-xs font-semibold">
-            Làm mới
+            {t('common.reload')}
           </Button>
           <Button
             type="primary"
@@ -283,7 +280,7 @@ const SupplierInfoPage = () => {
             onClick={() => handleOpenModal()}
             className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
           >
-            Thêm Nhà Cung Cấp
+            {t('suppliers.createNew')}
           </Button>
         </Space>
       </div>
@@ -293,73 +290,90 @@ const SupplierInfoPage = () => {
         <IsolatedSearchBar onSearch={handleSearchTrigger} />
 
         <Table
+          size="middle"
           columns={columns}
           dataSource={suppliers}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
+          locale={{
+            emptyText: currentSearch ? (
+              <div className="py-8 text-center">
+                <SearchOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button size="small" onClick={() => handleSearchTrigger('')} className="text-xs mt-2">{t('common.clear')}</Button>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <ShopOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => handleOpenModal()} className="bg-indigo-600 border-0 text-xs mt-3">
+                  {t('suppliers.createNew')}
+                </Button>
+              </div>
+            ),
+          }}
           pagination={{
             current: pagination.page,
             pageSize: pagination.limit,
             total: pagination.total,
             onChange: (p, l) => fetchSuppliers(p, l, currentSearch),
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} NCC`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
         />
       </Card>
 
       {/* Add/Edit Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">{editingSupplier ? 'Cập Nhật Thông Tin Nhà Cung Cấp' : 'Thêm Nhà Cung Cấp Mới'}</span>}
+        title={<span className="font-bold text-slate-900">{editingSupplier ? t('suppliers.editTitle') : t('suppliers.createNew')}</span>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
-        destroyOnClose
-        width={550}
+        destroyOnHidden
+        width={640}
       >
         <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
-          <Form.Item label="Sản Phẩm Phụ Tùng" name="productId" rules={[{ required: true, message: 'Vui lòng chọn sản phẩm phụ tùng!' }]}>
+          <Form.Item label={t('products.title')} name="productId" rules={[{ required: true, message: t('common.required') }]}>
             <Select
-              placeholder="Chọn sản phẩm phụ tùng từ hệ thống..."
+              placeholder={t('common.select')}
               showSearch
               optionFilterProp="label"
               options={productOptions}
             />
           </Form.Item>
 
-          <Form.Item label="Tên Nhà Cung Cấp" name="supplierName" rules={[{ required: true, message: 'Nhập tên nhà cung cấp!' }]}>
-            <Input placeholder="Công ty / Tập đoàn Nhà Cung Cấp..." />
+          <Form.Item label={t('suppliers.name')} name="supplierName" rules={[{ required: true, message: t('common.required') }]}>
+            <Input placeholder="Supplier Name" />
           </Form.Item>
 
-          <Form.Item label="Logo / Hình Ảnh Nhà Cung Cấp" name="imageUrl">
-            <ImageUploadInput resModel="supplier" placeholder="/uploads/suppliers/... hoặc chọn ảnh từ máy..." />
+          <Form.Item label={t('common.image')} name="imageUrl">
+            <ImageUploadInput resModel="supplier" placeholder="/uploads/..." />
           </Form.Item>
 
-          <Form.Item label="Mã Sản Phẩm Riêng Của Nhà Cung Cấp" name="productCode" rules={[{ required: true, message: 'Nhập mã sản phẩm riêng!' }]}>
-            <Input placeholder="SUP-VG1540080015" />
+          <Form.Item label={t('suppliers.code')} name="productCode" rules={[{ required: true, message: t('common.required') }]}>
+            <Input placeholder="SUP-CODE-123" />
           </Form.Item>
 
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item label="Giá Nhập / Mua (VND)" name="price" rules={[{ required: true, message: 'Nhập giá!' }]}>
+            <Form.Item label={t('products.costPrice')} name="price" rules={[{ required: true, message: t('common.required') }]}>
               <InputNumber
                 style={{ width: '100%' }}
                 min={0}
                 step={50000}
                 suffix="VND"
-                formatter={(value) => (value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '')}
-                parser={(value) => (value ? value.replace(/\./g, '') : '')}
-                placeholder="Nhập giá mua..."
+                placeholder="Price..."
               />
             </Form.Item>
-            <Form.Item label="Số Lượng Nhập Tối Thiểu (Min Qty)" name="minQty">
-              <InputNumber style={{ width: '100%' }} min={1} placeholder="VD: 10" />
+            <Form.Item label={t('inventory.quantity')} name="minQty">
+              <InputNumber style={{ width: '100%' }} min={1} placeholder="Min Qty" />
             </Form.Item>
           </div>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={submitting} className="bg-indigo-600">
-              Lưu Thông Tin
+              {t('common.save')}
             </Button>
           </div>
         </Form>

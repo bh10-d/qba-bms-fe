@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Modal, Form, Card, Space, Typography, Popconfirm, Tag, InputNumber, Progress, notification } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, KeyOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { rolesApi } from '../api/modulesApi';
 import { useAuth, getRoleCode } from '../context/AuthContext';
 
@@ -15,6 +16,7 @@ const ROLE_COLORS = {
 };
 
 const RolesManagementPage = () => {
+  const { t } = useTranslation();
   const { user, hasRole } = useAuth();
   const currentRole = getRoleCode(user);
   const isSuperAdmin = currentRole === 'SUPERADMIN';
@@ -22,7 +24,7 @@ const RolesManagementPage = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const [form] = Form.useForm();
@@ -54,7 +56,7 @@ const RolesManagementPage = () => {
 
   const handleOpenModal = (record = null) => {
     if (!isWriteAllowed) {
-      notification.error({ message: 'Chỉ ADMIN mới có quyền chỉnh sửa vai trò!' });
+      notification.error({ message: t('common.error') });
       return;
     }
 
@@ -74,16 +76,16 @@ const RolesManagementPage = () => {
         await rolesApi.update(editingRole.id, values);
         setRoles(roles.map((r) => (r.id === editingRole.id ? { ...r, ...values } : r)));
         notification.success({
-          message: 'Cập nhật vai trò thành công',
-          description: `Đã cập nhật vai trò "${values.name}" (${values.code}).`,
+          message: t('common.success'),
+          description: values.name,
         });
       } else {
         const res = await rolesApi.create(values);
         const newRole = res?.data || { id: Date.now(), isSystem: false, ...values };
         setRoles([newRole, ...roles]);
         notification.success({
-          message: 'Tạo vai trò mới thành công',
-          description: `Đã khởi tạo vai trò "${values.name}" (Mã: ${values.code}).`,
+          message: t('common.success'),
+          description: values.name,
         });
       }
       setIsModalOpen(false);
@@ -95,8 +97,8 @@ const RolesManagementPage = () => {
         setRoles([{ id: Date.now(), ...values }, ...roles]);
       }
       notification.success({
-        message: 'Đã lưu vai trò',
-        description: `Đã lưu vai trò "${values.name}".`,
+        message: t('common.success'),
+        description: values.name,
       });
       setIsModalOpen(false);
     } finally {
@@ -107,8 +109,8 @@ const RolesManagementPage = () => {
   const handleDelete = async (record) => {
     if (record.isSystem) {
       notification.warning({
-        message: 'Không thể xóa vai trò',
-        description: `Vai trò "${record.name}" là vai trò mặc định của hệ thống!`,
+        message: t('common.warning'),
+        description: record.name,
       });
       return;
     }
@@ -120,8 +122,8 @@ const RolesManagementPage = () => {
     } finally {
       setRoles(roles.filter((r) => r.id !== record.id));
       notification.info({
-        message: 'Xóa vai trò thành công',
-        description: `Đã xóa vai trò "${record.name}" (${record.code}).`,
+        message: t('common.info'),
+        description: record.name,
       });
     }
   };
@@ -131,13 +133,13 @@ const RolesManagementPage = () => {
     .filter((r) => isSuperAdmin || r.code !== 'SUPERADMIN')
     .filter(
       (r) =>
-        r.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        r.code.toLowerCase().includes(searchText.toLowerCase())
+        (r.name || '').toLowerCase().includes(searchText.toLowerCase()) ||
+        (r.code || '').toLowerCase().includes(searchText.toLowerCase())
     );
 
   const columns = [
     {
-      title: 'Mã Vai Trò (Code)',
+      title: t('roles.roleCode'),
       dataIndex: 'code',
       key: 'code',
       render: (code) => {
@@ -150,13 +152,13 @@ const RolesManagementPage = () => {
       },
     },
     {
-      title: 'Tên Vai Trò (Name)',
+      title: t('roles.roleName'),
       dataIndex: 'name',
       key: 'name',
       render: (name) => <span className="font-bold text-slate-900 text-sm">{name}</span>,
     },
     {
-      title: 'Trọng Số Cấp Độ (Level)',
+      title: t('roles.level'),
       dataIndex: 'level',
       key: 'level',
       render: (level = 20) => (
@@ -175,23 +177,13 @@ const RolesManagementPage = () => {
       ),
     },
     {
-      title: 'Mô Tả Chức Năng',
+      title: t('roles.description'),
       dataIndex: 'description',
       key: 'description',
       render: (desc) => <span className="text-xs text-slate-600">{desc}</span>,
     },
     {
-      title: 'Hệ Thống Mặc Định',
-      dataIndex: 'isSystem',
-      key: 'isSystem',
-      render: (isSystem) => (
-        <Tag color={isSystem ? 'purple' : 'default'} className="font-bold">
-          {isSystem ? 'SYSTEM ROLE' : 'DYNAMIC ROLE'}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Hành Động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => (
         <Space size="small">
@@ -204,7 +196,7 @@ const RolesManagementPage = () => {
           {record.isSystem ? (
             <Tag icon={<LockOutlined />} className="text-[10px] m-0">LOCKED</Tag>
           ) : (
-            <Popconfirm title="Xóa vai trò này?" onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
+            <Popconfirm title={t('roles.deleteConfirm')} onConfirm={() => handleDelete(record)} okButtonProps={{ danger: true }}>
               <Button type="text" danger icon={<DeleteOutlined />} disabled={!isWriteAllowed} />
             </Popconfirm>
           )}
@@ -219,16 +211,16 @@ const RolesManagementPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <h2 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
-            <KeyOutlined className="text-indigo-600" /> Quản Lý Vai Trò Hệ Thống (Roles Management)
+            <KeyOutlined className="text-indigo-600" /> {t('roles.title')}
           </h2>
           <Text className="text-slate-500 text-xs mt-1 block">
-            Danh mục các vai trò và phân cấp quyền hạn trong hệ thống
+            {t('roles.searchPlaceholder')}
           </Text>
         </div>
 
-        <Space>
+        <Space wrap className="w-full sm:w-auto">
           <Button icon={<ReloadOutlined />} onClick={fetchRoles} loading={loading} className="text-xs font-semibold">
-            Làm mới
+            {t('common.reload')}
           </Button>
           {isWriteAllowed && (
             <Button
@@ -237,7 +229,7 @@ const RolesManagementPage = () => {
               onClick={() => handleOpenModal()}
               className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
             >
-              Tạo Vai Trò Mới
+              {t('roles.createNew')}
             </Button>
           )}
         </Space>
@@ -247,7 +239,7 @@ const RolesManagementPage = () => {
       <Card className="rounded-xl border-slate-200 shadow-xs">
         <div className="mb-4 max-w-sm">
           <Input
-            placeholder="Tìm kiếm theo mã vai trò hoặc tên..."
+            placeholder={t('roles.searchPlaceholder')}
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -265,48 +257,46 @@ const RolesManagementPage = () => {
             defaultPageSize: 10,
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} vai trò`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
         />
       </Card>
 
       {/* Add/Edit Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">{editingRole ? 'Cập Nhật Vai Trò' : 'Tạo Vai Trò Mới'}</span>}
+        title={<span className="font-bold text-slate-900">{editingRole ? t('roles.editTitle') : t('roles.createNew')}</span>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         destroyOnHidden
+        width={640}
       >
         <Form form={form} layout="vertical" onFinish={handleSave} className="mt-4">
-          <Form.Item label="Tên Vai Trò (Name)" name="name" rules={[{ required: true, message: 'Nhập tên vai trò!' }]}>
-            <Input placeholder="Quản Lý Kho Nam" />
+          <Form.Item label={t('roles.roleName')} name="name" rules={[{ required: true, message: t('common.required') }]}>
+            <Input placeholder="Role Name" />
           </Form.Item>
 
-          <Form.Item label="Mã Vai Trò (Code - Viết hoa)" name="code" rules={[{ required: true, message: 'Nhập mã vai trò!' }]}>
-            <Input placeholder="MANAGER_KHO_NAM" disabled={editingRole?.isSystem} />
+          <Form.Item label={t('roles.roleCode')} name="code" rules={[{ required: true, message: t('common.required') }]}>
+            <Input placeholder="ROLE_CODE" disabled={editingRole?.isSystem} />
           </Form.Item>
 
           <Form.Item
-            label="Trọng Số Phân Cấp (Level: 1 - 80)"
+            label={t('roles.level')}
             name="level"
             initialValue={60}
-            rules={[
-              { required: true, message: 'Vui lòng nhập cấp độ!' },
-              { type: 'number', max: 80, message: 'Cấp độ tối đa cho phép là 80 (Level 100 dành riêng cho SuperAdmin)' },
-            ]}
+            rules={[{ required: true, message: t('common.required') }]}
           >
             <InputNumber min={1} max={80} className="w-full" />
           </Form.Item>
 
-          <Form.Item label="Mô Tả Chức Năng" name="description">
-            <Input.TextArea rows={2} placeholder="Mô tả quyền hạn cho vai trò này..." />
+          <Form.Item label={t('roles.description')} name="description">
+            <Input.TextArea rows={2} placeholder="..." />
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={submitting} className="bg-indigo-600">
-              Lưu Vai Trò
+              {t('common.save')}
             </Button>
           </div>
         </Form>

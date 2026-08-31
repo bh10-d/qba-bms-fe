@@ -221,9 +221,7 @@
 .brand-title {
   font-weight: 800;
   font-size: 18px;
-  background: linear-gradient(135deg, #fff, #94a3b8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #0f172a;
 }
 
 .api-badge {

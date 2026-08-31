@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Layout, Menu, Avatar, Dropdown, Tag, Input, Badge, Button, Breadcrumb, Tooltip } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, Tag, Input, Badge, Button, Breadcrumb, Tooltip, Segmented } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   DashboardOutlined,
   UserOutlined,
@@ -24,7 +25,8 @@ import {
   BookOutlined,
   ShoppingOutlined,
   ShoppingCartOutlined,
-  InboxOutlined
+  InboxOutlined,
+  GlobalOutlined
 } from '@ant-design/icons';
 import { useAuth, getRoleCode } from '../context/AuthContext';
 
@@ -39,7 +41,9 @@ const ROLE_COLORS = {
 };
 
 const MainLayout = ({ children }) => {
+  const { t, i18n } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
+  const [menuSearch, setMenuSearch] = useState('');
   const { user, logout, hasRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -48,121 +52,211 @@ const MainLayout = ({ children }) => {
   const roleColor = ROLE_COLORS[currentRole] || 'blue';
   const isSuperAdmin = currentRole === 'SUPERADMIN';
 
-  // Memoized Sidebar Menu Items filtered strictly by dynamic role levels
+  // Auto-determine default open submenu based on active route
+  const defaultSubmenuKey = useMemo(() => {
+    const p = location.pathname;
+    if (['/dashboard/purchases', '/dashboard/orders', '/dashboard/inventory', '/dashboard/suppliers'].includes(p)) {
+      return 'sub-operations';
+    }
+    if (['/dashboard/products', '/dashboard/vehicles', '/dashboard/brands', '/dashboard/engines', '/dashboard/gearboxes'].includes(p)) {
+      return 'sub-masterdata';
+    }
+    if (['/dashboard/accounting', '/dashboard/labels'].includes(p)) {
+      return 'sub-finance';
+    }
+    if (['/dashboard/users', '/dashboard/roles', '/dashboard/api-console', '/dashboard/profile'].includes(p)) {
+      return 'sub-admin';
+    }
+    return '';
+  }, [location.pathname]);
+
+  const [openKeys, setOpenKeys] = useState(() => (defaultSubmenuKey ? [defaultSubmenuKey] : []));
+
+  useEffect(() => {
+    if (defaultSubmenuKey && !openKeys.includes(defaultSubmenuKey) && !menuSearch) {
+      setOpenKeys([defaultSubmenuKey]);
+    }
+  }, [defaultSubmenuKey]);
+
+  // Memoized Sidebar Menu Items grouped into compact Submenus
   const menuItems = useMemo(() => {
-    const rawItems = [
+    const rawStructure = [
       {
         key: '/dashboard',
         icon: <DashboardOutlined />,
-        label: 'Tổng Quan (Dashboard)',
-        roles: ['USER'], // Level >= 20
-      },
-      { type: 'divider' },
-      {
-        key: '/dashboard/brands',
-        icon: <TagsOutlined />,
-        label: 'Thương Hiệu (Brands)',
-        roles: ['USER'], // Level >= 20
+        label: t('menu.dashboard'),
+        roles: ['USER'],
       },
       {
-        key: '/dashboard/engines',
-        icon: <ThunderboltOutlined />,
-        label: 'Động Cơ (Engines)',
-        roles: ['USER'], // Level >= 20
-      },
-      {
-        key: '/dashboard/gearboxes',
-        icon: <SettingOutlined />,
-        label: 'Hộp Số (Gearboxes)',
-        roles: ['USER'], // Level >= 20
-      },
-      {
-        key: '/dashboard/vehicles',
-        icon: <CarOutlined />,
-        label: 'Dòng Xe (Vehicles)',
-        roles: ['USER'], // Level >= 20
-      },
-      {
-        key: '/dashboard/products',
-        icon: <BoxPlotOutlined />,
-        label: 'Phụ Tùng / Sản Phẩm',
-        roles: ['USER'], // Level >= 20
-      },
-      {
-        key: '/dashboard/orders',
-        icon: <ShoppingCartOutlined />,
-        label: 'Đơn Bán Hàng (Sales Orders)',
-        roles: ['USER'], // Level >= 20
-      },
-      {
-        key: '/dashboard/purchases',
+        key: 'sub-operations',
         icon: <ShoppingOutlined />,
-        label: 'Đơn Mua Hàng (Purchases)',
-        roles: ['USER'], // Level >= 20
+        label: t('menu.operations'),
+        children: [
+          {
+            key: '/dashboard/purchases',
+            icon: <ShoppingOutlined />,
+            label: t('menu.purchases'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/orders',
+            icon: <ShoppingCartOutlined />,
+            label: t('menu.orders'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/inventory',
+            icon: <InboxOutlined />,
+            label: t('menu.inventory'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/suppliers',
+            icon: <ShopOutlined />,
+            label: t('menu.suppliers'),
+            roles: ['MANAGER'],
+          },
+        ],
       },
       {
-        key: '/dashboard/inventory',
-        icon: <InboxOutlined />,
-        label: 'Quản Lý Kho (Inventory)',
-        roles: ['USER'], // Level >= 20
+        key: 'sub-masterdata',
+        icon: <BoxPlotOutlined />,
+        label: t('menu.masterdata'),
+        children: [
+          {
+            key: '/dashboard/products',
+            icon: <BoxPlotOutlined />,
+            label: t('menu.products'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/vehicles',
+            icon: <CarOutlined />,
+            label: t('menu.vehicles'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/brands',
+            icon: <TagsOutlined />,
+            label: t('menu.brands'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/engines',
+            icon: <ThunderboltOutlined />,
+            label: t('menu.engines'),
+            roles: ['USER'],
+          },
+          {
+            key: '/dashboard/gearboxes',
+            icon: <SettingOutlined />,
+            label: t('menu.gearboxes'),
+            roles: ['USER'],
+          },
+        ],
       },
       {
-        key: '/dashboard/suppliers',
-        icon: <ShopOutlined />,
-        label: 'Nhà Cung Cấp (Suppliers)',
-        roles: ['MANAGER'], // Level >= 60 (Manager, Admin, SuperAdmin)
-      },
-      {
-        key: '/dashboard/accounting',
+        key: 'sub-finance',
         icon: <BookOutlined />,
-        label: 'Kế Toán & Hóa Đơn (TT200)',
-        roles: ['MANAGER'], // Level >= 60 (Manager, Admin, SuperAdmin)
+        label: t('menu.financeTools'),
+        children: [
+          {
+            key: '/dashboard/accounting',
+            icon: <BookOutlined />,
+            label: t('menu.accounting'),
+            roles: ['MANAGER'],
+          },
+          {
+            key: '/dashboard/labels',
+            icon: <QrcodeOutlined />,
+            label: t('menu.labels'),
+            roles: ['STAFF'],
+          },
+        ],
       },
       {
-        key: '/dashboard/labels',
-        icon: <QrcodeOutlined />,
-        label: 'Wizard Tạo Tem Nhãn',
-        roles: ['STAFF'], // Level >= 40 (Staff, Manager, Admin, SuperAdmin)
-      },
-      { type: 'divider' },
-      {
-        key: '/dashboard/roles',
-        icon: <KeyOutlined />,
-        label: 'Quản Lý Vai Trò (Roles)',
-        roles: ['ADMIN'], // Level >= 80 (Admin, SuperAdmin)
-      },
-      {
-        key: '/dashboard/users',
+        key: 'sub-admin',
         icon: <TeamOutlined />,
-        label: 'Quản Lý Người Dùng',
-        roles: ['ADMIN'], // Level >= 80 (Admin, SuperAdmin)
-      },
-      {
-        key: '/dashboard/api-console',
-        icon: <ApiOutlined />,
-        label: 'API & Seed Console (Dev)',
-        roles: ['SUPERADMIN'], // Level >= 100
-      },
-      {
-        key: '/dashboard/profile',
-        icon: <UserOutlined />,
-        label: 'Hồ Sơ Cá Nhân',
-        roles: ['USER'], // Level >= 20
+        label: t('menu.systemAdmin'),
+        children: [
+          {
+            key: '/dashboard/users',
+            icon: <TeamOutlined />,
+            label: t('menu.users'),
+            roles: ['ADMIN'],
+          },
+          {
+            key: '/dashboard/roles',
+            icon: <KeyOutlined />,
+            label: t('menu.roles'),
+            roles: ['ADMIN'],
+          },
+          {
+            key: '/dashboard/api-console',
+            icon: <ApiOutlined />,
+            label: t('menu.apiConsole'),
+            roles: ['SUPERADMIN'],
+          },
+          {
+            key: '/dashboard/profile',
+            icon: <UserOutlined />,
+            label: t('menu.profile'),
+            roles: ['USER'],
+          },
+        ],
       },
     ];
 
-    return rawItems.filter((item) => {
-      if (!item.roles) return true;
-      return hasRole(item.roles);
-    });
-  }, [hasRole]);
+    // 1. Filter by role permissions
+    const roleFiltered = rawStructure
+      .map((node) => {
+        if (!node.children) {
+          if (!node.roles) return node;
+          return hasRole(node.roles) ? node : null;
+        }
+        const validChildren = node.children.filter((child) => {
+          if (!child.roles) return true;
+          return hasRole(child.roles);
+        });
+        if (validChildren.length === 0) return null;
+        return { ...node, children: validChildren };
+      })
+      .filter(Boolean);
+
+    // 2. Filter by search query if user typed
+    if (!menuSearch.trim()) {
+      return roleFiltered;
+    }
+
+    const q = menuSearch.toLowerCase().trim();
+    return roleFiltered
+      .map((node) => {
+        if (!node.children) {
+          const match = String(node.label || '').toLowerCase().includes(q) || String(node.key || '').toLowerCase().includes(q);
+          return match ? node : null;
+        }
+        const matchedChildren = node.children.filter((child) =>
+          String(child.label || '').toLowerCase().includes(q) ||
+          String(child.key || '').toLowerCase().includes(q)
+        );
+        if (matchedChildren.length === 0) return null;
+        return { ...node, children: matchedChildren };
+      })
+      .filter(Boolean);
+  }, [hasRole, menuSearch, t]);
 
   const userDropdownItems = useMemo(
     () => [
       {
         key: 'profile',
         icon: <UserOutlined />,
-        label: 'Thông tin cá nhân',
+        label: t('header.profile'),
+        onClick: () => navigate('/dashboard/profile'),
+      },
+      {
+        key: 'language',
+        icon: <GlobalOutlined />,
+        label: `${i18n.language?.startsWith('en') ? '🇬🇧 English' : '🇻🇳 Tiếng Việt'} (Settings)`,
         onClick: () => navigate('/dashboard/profile'),
       },
       ...(isSuperAdmin
@@ -180,49 +274,49 @@ const MainLayout = ({ children }) => {
         key: 'logout',
         icon: <LogoutOutlined />,
         danger: true,
-        label: 'Đăng xuất',
+        label: t('header.logout'),
         onClick: logout,
       },
     ],
-    [isSuperAdmin, navigate, logout]
+    [isSuperAdmin, navigate, logout, t, i18n.language]
   );
 
   const breadcrumbTitle = useMemo(() => {
     switch (location.pathname) {
       case '/dashboard/brands':
-        return 'Quản Lý Thương Hiệu';
+        return t('menu.brands');
       case '/dashboard/engines':
-        return 'Quản Lý Động Cơ';
+        return t('menu.engines');
       case '/dashboard/gearboxes':
-        return 'Quản Lý Hộp Số';
+        return t('menu.gearboxes');
       case '/dashboard/vehicles':
-        return 'Quản Lý Dòng Xe';
+        return t('menu.vehicles');
       case '/dashboard/products':
-        return 'Quản Lý Phụ Tùng / Sản Phẩm';
+        return t('menu.products');
       case '/dashboard/orders':
-        return 'Quản Lý Đơn Bán Hàng & Báo Giá';
+        return t('menu.orders');
       case '/dashboard/purchases':
-        return 'Quản Lý Đơn Mua Hàng NCC';
+        return t('menu.purchases');
       case '/dashboard/inventory':
-        return 'Quản Lý Kho & Tồn Kho Real-time';
+        return t('menu.inventory');
       case '/dashboard/suppliers':
-        return 'Quản Lý Nhà Cung Cấp';
+        return t('menu.suppliers');
       case '/dashboard/accounting':
-        return 'Phân Hệ Kế Toán & Tài Chính';
+        return t('menu.accounting');
       case '/dashboard/labels':
-        return 'Wizard Tạo Tem Nhãn Sản Phẩm';
+        return t('menu.labels');
       case '/dashboard/roles':
-        return 'Quản Lý Vai Trò Hệ Thống';
+        return t('menu.roles');
       case '/dashboard/users':
-        return 'Quản Lý Người Dùng';
+        return t('menu.users');
       case '/dashboard/api-console':
-        return 'API Console & Debug Tool';
+        return t('menu.apiConsole');
       case '/dashboard/profile':
-        return 'Hồ Sơ Cá Nhân';
+        return t('menu.profile');
       default:
-        return 'Tổng Quan Báo Cáo';
+        return t('menu.dashboard');
     }
-  }, [location.pathname]);
+  }, [location.pathname, t]);
 
   return (
     <Layout className="min-h-screen bg-slate-50">
@@ -232,7 +326,7 @@ const MainLayout = ({ children }) => {
         collapsible
         collapsed={collapsed}
         theme="light"
-        width={250}
+        width={275}
         style={{
           background: '#ffffff',
           position: 'sticky',
@@ -252,12 +346,12 @@ const MainLayout = ({ children }) => {
                   <div className="font-extrabold text-sm text-slate-900 leading-tight truncate">
                     QBA BMS Portal
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate">Hệ Thống Quản Lý Enterprise</div>
+                  <div className="text-[11px] text-slate-500 truncate">{t('header.subTitle')}</div>
                 </div>
               )}
             </div>
 
-            <Tooltip title={collapsed ? "Mở rộng Sidebar" : "Thu gọn Sidebar"} placement="right">
+            <Tooltip title={collapsed ? t('common.reload') : t('common.close')} placement="right">
               <Button
                 type="text"
                 size="small"
@@ -268,11 +362,12 @@ const MainLayout = ({ children }) => {
             </Tooltip>
           </div>
 
-          {/* Middle Scrollable Menu */}
-          <div className="flex-1 overflow-y-auto px-2 py-2">
+          <div className="flex-1 overflow-y-auto px-2 py-1">
             <Menu
               mode="inline"
               selectedKeys={[location.pathname]}
+              openKeys={openKeys}
+              onOpenChange={(keys) => setOpenKeys(keys)}
               items={menuItems}
               onClick={({ key }) => navigate(key)}
               style={{ border: 0 }}
@@ -286,7 +381,7 @@ const MainLayout = ({ children }) => {
               <div className="flex items-center gap-2 mb-0.5">
                 <CheckCircleOutlined className="text-emerald-500 text-xs" />
                 <span className="text-xs font-bold text-slate-800">
-                  {isSuperAdmin ? 'Backend Connected' : 'Hệ Thống Hoạt Động'}
+                  {isSuperAdmin ? t('header.backendConnected') : t('header.systemActive')}
                 </span>
               </div>
               <div className="text-[11px] text-slate-500">
@@ -302,38 +397,22 @@ const MainLayout = ({ children }) => {
         {/* Top Header */}
         <Header
           style={{ background: '#ffffff', height: '64px', lineHeight: '64px' }}
-          className="border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10 shadow-2xs"
+          className="border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs"
         >
           <div className="flex items-center gap-4">
             <Breadcrumb
               items={[
-                { title: <span className="text-slate-500 font-medium">BMS Portal</span> },
+                { title: <span className="text-slate-500 font-medium">{t('header.portal')}</span> },
                 { title: <span className="text-slate-800 font-bold">{breadcrumbTitle}</span> },
               ]}
-              className="text-xs"
+              className="text-xs hidden sm:block"
             />
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* <div className="hidden md:block w-64">
-              <Input
-                placeholder="Tìm kiếm dữ liệu..."
-                prefix={<SearchOutlined className="text-slate-400" />}
-                className="rounded-full bg-slate-50 border-slate-200 text-xs"
-              />
-            </div> */}
-
-            {/* <Tooltip title="Thông báo hệ thống">
-              <Badge count={2} size="small">
-                <Button type="text" shape="circle" icon={<BellOutlined />} className="text-slate-600" />
-              </Badge>
-            </Tooltip> */}
-
-            <div className="h-6 w-[1px] bg-slate-200 hidden sm:block" />
-
+          <div className="flex items-center gap-3">
             {/* User Profile Dropdown */}
             <Dropdown menu={{ items: userDropdownItems }} placement="bottomRight" arrow={{ pointAtCenter: true }}>
-              <div className="flex items-center gap-2.5 cursor-pointer py-1 px-2 rounded-xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-200">
+              <div className="flex items-center gap-2.5 cursor-pointer py-1 px-2.5 rounded-xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-200">
                 <Avatar style={{ backgroundColor: '#4f46e5' }} size="small" icon={<UserOutlined />}>
                   {user?.name?.[0] || user?.fullName?.[0] || 'U'}
                 </Avatar>
@@ -354,7 +433,7 @@ const MainLayout = ({ children }) => {
         </Header>
 
         {/* Content Area */}
-        <Content className="p-6 lg:p-8 max-w-[1800px] w-full mx-auto min-h-[calc(100vh-64px)]">
+        <Content className="p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto min-h-[calc(100vh-64px)]">
           {children || <Outlet />}
         </Content>
       </Layout>

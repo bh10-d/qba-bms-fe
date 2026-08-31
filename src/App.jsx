@@ -38,12 +38,28 @@ const ANTD_THEME_CONFIG = {
   algorithm: theme.defaultAlgorithm,
   token: {
     colorPrimary: '#4f46e5',
-    borderRadius: 8,
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    borderRadius: 10,
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     colorBgContainer: '#ffffff',
     colorBgLayout: '#f8fafc',
     colorTextHeading: '#0f172a',
     colorText: '#334155',
+    colorBorderSecondary: '#e2e8f0',
+  },
+  components: {
+    Card: {
+      borderRadiusLG: 12,
+      paddingLG: 20,
+    },
+    Table: {
+      borderRadius: 10,
+      headerBg: '#f1f5f9',
+      headerColor: '#0f172a',
+    },
+    Button: {
+      borderRadius: 8,
+      fontWeight: 600,
+    },
   },
 };
 

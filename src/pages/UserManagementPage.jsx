@@ -8,6 +8,7 @@ import {
   UserOutlined,
   SafetyCertificateOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth, getRoleCode, getRoleLevel } from '../context/AuthContext';
 import { usersApi, rolesApi } from '../api/modulesApi';
 import ImageUploadInput from '../components/ImageUploadInput';
@@ -30,6 +31,7 @@ const DEFAULT_ROLE_OPTIONS = [
 ];
 
 const UserManagementPage = () => {
+  const { t } = useTranslation();
   const { user, hasRole } = useAuth();
   const currentRole = getRoleCode(user);
   const currentLevel = getRoleLevel(user);
@@ -41,10 +43,11 @@ const UserManagementPage = () => {
   }, [isSuperAdmin, currentLevel]);
 
   const [users, setUsers] = useState([]);
-  const [availableRoles, setAvailableRoles] = useState(filteredDefaultRoles);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [availableRoles, setAvailableRoles] = useState(filteredDefaultRoles);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -57,6 +60,7 @@ const UserManagementPage = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await usersApi.getAll();
       const data = res?.data || res;
@@ -67,7 +71,7 @@ const UserManagementPage = () => {
       }
     } catch (err) {
       console.warn('API /users fetch failed:', err);
-      setUsers([]);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -99,8 +103,8 @@ const UserManagementPage = () => {
   const handleAddUser = async (values) => {
     if (!isWriteAllowed) {
       notification.error({
-        message: 'Không có quyền thao tác',
-        description: 'Chỉ tài khoản ADMIN trở lên mới được phép tạo người dùng mới!',
+        message: t('common.error'),
+        description: t('common.error'),
       });
       return;
     }
@@ -123,12 +127,11 @@ const UserManagementPage = () => {
         role: { code: values.roleCode, level: values.roleCode === 'ADMIN' ? 80 : 20 },
         status: 'ACTIVE',
         createdAt: new Date().toISOString().split('T')[0],
-        lastActive: 'Vừa tạo',
       };
       setUsers([newUser, ...users]);
       notification.success({
-        message: 'Tạo người dùng thành công',
-        description: `Đã tạo tài khoản "${values.fullName}" (${values.email}) với vai trò ${values.roleCode}.`,
+        message: t('common.success'),
+        description: values.fullName,
       });
       setIsAddModalOpen(false);
       addForm.resetFields();
@@ -142,12 +145,11 @@ const UserManagementPage = () => {
         role: { code: values.roleCode, level: 20 },
         status: 'ACTIVE',
         createdAt: new Date().toISOString().split('T')[0],
-        lastActive: 'Vừa tạo',
       };
       setUsers([newUser, ...users]);
       notification.success({
-        message: 'Tạo người dùng thành công',
-        description: `Đã thêm tài khoản "${values.fullName}" (${values.email}).`,
+        message: t('common.success'),
+        description: values.fullName,
       });
       setIsAddModalOpen(false);
       addForm.resetFields();
@@ -172,8 +174,8 @@ const UserManagementPage = () => {
   const handleToggleLock = async (record) => {
     if (!isWriteAllowed) {
       notification.error({
-        message: 'Không có quyền thao tác',
-        description: 'Chỉ ADMIN/SUPERADMIN mới có quyền khóa/mở khóa tài khoản người dùng!',
+        message: t('common.error'),
+        description: t('common.error'),
       });
       return;
     }
@@ -187,7 +189,6 @@ const UserManagementPage = () => {
 
       const newIsActive = updatedData?.isActive !== undefined ? updatedData.isActive : !isUserActive(record);
       const newStatus = newIsActive ? 'ACTIVE' : 'LOCKED';
-      const actionText = newIsActive ? 'Đã mở khóa' : 'Đã khóa';
 
       setUsers((prevUsers) =>
         prevUsers.map((u) => {
@@ -223,15 +224,14 @@ const UserManagementPage = () => {
       }
 
       notification.success({
-        message: `${actionText} tài khoản thành công`,
-        description: `${actionText} tài khoản "${record.fullName || record.name}" (${record.email}).`,
+        message: t('common.success'),
+        description: record.fullName || record.name,
       });
     } catch (err) {
       console.error('Toggle lock user error:', err);
-      const errorMsg = err.message || err.error || 'Có lỗi xảy ra khi thay đổi trạng thái tài khoản!';
       notification.error({
-        message: 'Thao tác khóa/mở khóa thất bại',
-        description: errorMsg,
+        message: t('common.error'),
+        description: t('common.error'),
       });
     }
   };
@@ -250,17 +250,12 @@ const UserManagementPage = () => {
     });
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return '29/08/2026 11:46';
+    if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
       const pad = (n) => String(n).padStart(2, '0');
-      const day = pad(d.getDate());
-      const month = pad(d.getMonth() + 1);
-      const year = d.getFullYear();
-      const hours = pad(d.getHours());
-      const mins = pad(d.getMinutes());
-      return `${day}/${month}/${year} ${hours}:${mins}`;
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     } catch {
       return dateStr;
     }
@@ -268,26 +263,29 @@ const UserManagementPage = () => {
 
   const columns = [
     {
-      title: 'Người dùng',
+      title: t('users.fullName'),
       dataIndex: 'name',
       key: 'name',
       render: (text, record) => {
         const code = getRoleCode(record);
+        const nameStr = text || record.fullName || 'User';
         return (
-          <div className="flex items-center gap-3">
-            <Avatar style={{ backgroundColor: code === 'SUPERADMIN' ? '#ef4444' : code === 'ADMIN' ? '#c084fc' : '#6366f1' }}>
-              {(text || record.fullName || 'U')[0]}
-            </Avatar>
-            <div>
-              <div className="font-bold text-slate-900 text-sm">{text || record.fullName}</div>
-              <div className="text-xs text-slate-500">{record.email}</div>
+          <Tooltip title={`${nameStr} (${record.email})`} placement="topLeft">
+            <div className="flex items-center gap-3">
+              <Avatar style={{ backgroundColor: code === 'SUPERADMIN' ? '#ef4444' : code === 'ADMIN' ? '#c084fc' : '#6366f1' }}>
+                {nameStr[0]}
+              </Avatar>
+              <div>
+                <div className="font-bold text-slate-900 text-sm truncate max-w-[180px]">{nameStr}</div>
+                <div className="text-xs text-slate-500 truncate max-w-[180px]">{record.email}</div>
+              </div>
             </div>
-          </div>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Vai Trò',
+      title: t('users.role'),
       key: 'role',
       render: (_, record) => {
         const code = getRoleCode(record);
@@ -298,32 +296,32 @@ const UserManagementPage = () => {
       },
     },
     {
-      title: 'Trạng Thái',
+      title: t('users.status'),
       key: 'status',
       render: (_, record) => {
         const active = isUserActive(record);
         return (
           <Badge
             status={active ? 'success' : 'error'}
-            text={<span className="font-semibold text-xs text-slate-700">{active ? 'Hoạt động' : 'Đã khóa'}</span>}
+            text={<span className="font-semibold text-xs text-slate-700">{active ? t('common.active') : t('common.inactive')}</span>}
           />
         );
       },
     },
     {
-      title: 'Ngày Tạo',
+      title: t('common.createdAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date) => <span className="text-xs text-slate-600 font-mono font-medium">{formatDate(date)}</span>,
     },
     {
-      title: 'Hành động',
+      title: t('common.action'),
       key: 'action',
       render: (_, record) => {
         const active = isUserActive(record);
         return (
           <Space size="small">
-            <Tooltip title="Xem thông tin chi tiết">
+            <Tooltip title={t('common.view')}>
               <Button
                 type="text"
                 size="small"
@@ -333,7 +331,7 @@ const UserManagementPage = () => {
             </Tooltip>
 
             {isWriteAllowed && (
-              <Tooltip title={active ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}>
+              <Tooltip title={active ? t('common.inactive') : t('common.active')}>
                 <Button
                   type="text"
                   size="small"
@@ -355,10 +353,10 @@ const UserManagementPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
           <h2 className="text-lg font-bold text-slate-900 m-0">
-            Danh Sách Người Dùng & Phân Quyền
+            {t('users.title')}
           </h2>
           <Text className="text-slate-500 text-xs mt-1 block">
-            Quản lý tài khoản nhân viên, phân quyền hạn và trạng thái hoạt động
+            {t('users.searchPlaceholder')}
           </Text>
         </div>
 
@@ -367,24 +365,28 @@ const UserManagementPage = () => {
             type="primary"
             icon={<UserAddOutlined />}
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0"
+            className="bg-indigo-600 hover:bg-indigo-500 font-bold shadow-sm shadow-indigo-100 text-xs border-0 w-full sm:w-auto"
           >
-            Thêm Người Dùng Mới
+            {t('users.createNew')}
           </Button>
         ) : (
           <Tag color="cyan" className="font-bold py-1.5 px-3 text-xs">
-            Chế Độ Xem (Read Only)
+            Read Only
           </Tag>
         )}
       </div>
 
-      {!isWriteAllowed && (
+      {error && (
         <Alert
-          title="Thông Báo Phân Quyền"
-          description="Bạn đang xem danh sách người dùng được phân cấp từ level hiện tại trở xuống."
-          type="info"
+          type="error"
           showIcon
-          className="rounded-xl"
+          message={t('common.error')}
+          action={
+            <Button size="small" type="primary" danger onClick={fetchUsers} loading={loading}>
+              {t('common.reload')}
+            </Button>
+          }
+          className="rounded-xl mb-4"
         />
       )}
 
@@ -392,7 +394,7 @@ const UserManagementPage = () => {
       <Card className="rounded-xl border-slate-200 shadow-xs">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
           <Input
-            placeholder="Tìm kiếm theo Tên hoặc Email..."
+            placeholder={t('users.searchPlaceholder')}
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -401,13 +403,13 @@ const UserManagementPage = () => {
           />
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-xs font-bold text-slate-500">Lọc theo Role:</span>
+            <span className="text-xs font-bold text-slate-500">{t('common.filter')}:</span>
             <Select
               value={roleFilter}
               onChange={(val) => setRoleFilter(val)}
               className="w-44"
               options={[
-                { value: 'ALL', label: 'Tất cả Roles' },
+                { value: 'ALL', label: t('common.all') },
                 ...(isSuperAdmin ? [{ value: 'SUPERADMIN', label: 'SUPERADMIN' }] : []),
                 { value: 'ADMIN', label: 'ADMIN' },
                 { value: 'MANAGER', label: 'MANAGER' },
@@ -419,15 +421,30 @@ const UserManagementPage = () => {
         </div>
 
         <Table
+          size="middle"
           columns={columns}
           dataSource={filteredUsers}
           rowKey={(record) => record.id || record.key || record.email}
           loading={loading}
+          scroll={{ x: 'max-content' }}
+          locale={{
+            emptyText: (
+              <div className="py-8 text-center">
+                <UserOutlined className="text-slate-300 text-3xl mb-2" />
+                <div className="text-slate-600 font-bold text-xs">{t('common.noData')}</div>
+                {isWriteAllowed && (
+                  <Button type="primary" size="small" icon={<UserAddOutlined />} onClick={() => setIsAddModalOpen(true)} className="bg-indigo-600 border-0 text-xs mt-3">
+                    {t('users.createNew')}
+                  </Button>
+                )}
+              </div>
+            ),
+          }}
           pagination={{
             defaultPageSize: 10,
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / Tổng ${total} người dùng`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
           }}
           className="overflow-x-auto"
         />
@@ -435,37 +452,38 @@ const UserManagementPage = () => {
 
       {/* Add User Modal */}
       <Modal
-        title={<span className="font-bold text-slate-900">Tạo Tài Khoản Người Dùng Mới</span>}
+        title={<span className="font-bold text-slate-900">{t('users.createNew')}</span>}
         open={isAddModalOpen}
         onCancel={() => setIsAddModalOpen(false)}
         footer={null}
         destroyOnHidden
+        width={640}
       >
         <Form form={addForm} layout="vertical" onFinish={handleAddUser} className="mt-4">
-          <Form.Item label="Họ và Tên" name="fullName" rules={[{ required: true, message: 'Nhập họ tên!' }]}>
-            <Input prefix={<UserOutlined />} placeholder="Nguyễn Văn A" />
+          <Form.Item label={t('users.fullName')} name="fullName" rules={[{ required: true, message: t('common.required') }]}>
+            <Input prefix={<UserOutlined />} placeholder="Full Name" />
           </Form.Item>
 
-          <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email', message: 'Nhập email hợp lệ!' }]}>
-            <Input placeholder="user@qbabms.com" />
+          <Form.Item label={t('users.email')} name="email" rules={[{ required: true, type: 'email', message: t('common.required') }]}>
+            <Input placeholder="email@domain.com" />
           </Form.Item>
 
-          <Form.Item label="Mật khẩu" name="password" rules={[{ required: true, min: 6, message: 'Tối thiểu 6 ký tự!' }]}>
+          <Form.Item label={t('users.password')} name="password" rules={[{ required: true, min: 6, message: t('common.required') }]}>
             <Input.Password placeholder="••••••••" />
           </Form.Item>
 
-          <Form.Item label="Ảnh Đại Diện (Avatar)" name="avatarUrl">
-            <ImageUploadInput placeholder="https://... hoặc chọn ảnh từ máy..." />
+          <Form.Item label={t('common.image')} name="avatarUrl">
+            <ImageUploadInput placeholder="/uploads/..." />
           </Form.Item>
 
-          <Form.Item label="Chỉ định Vai trò" name="roleCode" initialValue="USER">
+          <Form.Item label={t('users.role')} name="roleCode" initialValue="USER">
             <Select options={availableRoles} />
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button onClick={() => setIsAddModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => setIsAddModalOpen(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit" loading={isSubmitting} className="bg-indigo-600">
-              Tạo Tài Khoản
+              {t('common.save')}
             </Button>
           </div>
         </Form>
@@ -473,7 +491,7 @@ const UserManagementPage = () => {
 
       {/* User Details Drawer */}
       <Drawer
-        title={<span className="font-bold text-slate-900">Chi Tiết Tài Khoản Người Dùng</span>}
+        title={<span className="font-bold text-slate-900">{t('common.details')}</span>}
         placement="right"
         onClose={() => setIsDrawerOpen(false)}
         open={isDrawerOpen}
@@ -493,19 +511,14 @@ const UserManagementPage = () => {
             </div>
 
             <Descriptions column={1} bordered className="rounded-xl overflow-hidden">
-              <Descriptions.Item label="ID">{selectedUser.id}</Descriptions.Item>
-              <Descriptions.Item label="Trạng thái">
+              <Descriptions.Item label={t('common.id')}>{selectedUser.id}</Descriptions.Item>
+              <Descriptions.Item label={t('users.status')}>
                 <Tag color={isUserActive(selectedUser) ? 'success' : 'error'}>
-                  {isUserActive(selectedUser) ? 'HOẠT ĐỘNG (ACTIVE)' : 'ĐÃ KHÓA (LOCKED)'}
+                  {isUserActive(selectedUser) ? t('common.active') : t('common.inactive')}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Ngày tạo">{formatDate(selectedUser.createdAt)}</Descriptions.Item>
+              <Descriptions.Item label={t('common.createdAt')}>{formatDate(selectedUser.createdAt)}</Descriptions.Item>
             </Descriptions>
-
-            <div className={`p-3 border rounded-xl text-xs ${isUserActive(selectedUser) ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-              <SafetyCertificateOutlined className={`mr-1 ${isUserActive(selectedUser) ? 'text-indigo-600' : 'text-rose-600'}`} />
-              {isUserActive(selectedUser) ? 'Tài khoản đang hoạt động bình thường.' : 'Tài khoản đã bị tạm khóa bởi quản trị viên.'}
-            </div>
           </div>
         )}
       </Drawer>
