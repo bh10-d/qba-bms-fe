@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* Fix 1: Ant Design Sider inner container flexbox fix */
+.ant-layout-sider-children {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Fix 2: Ant Design Layout Header default #001529 navy background override */
+.ant-layout-header {
+  background: #ffffff !important;
+  color: #334155 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  line-height: normal !important;
+  padding: 0 24px !important;
+}
+
+/* Fix 3: Ant Design SVG Icon display reset from Tailwind v4 Preflight */
+.anticon {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.anticon svg {
+  display: inline-block !important;
+}
+
+/* Fix 4: Ensure Ant Design Layout and Sider background consistency */
+.ant-layout {
+  background-color: #f8fafc !important;
+}
+
+.ant-layout-sider {
+  background-color: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+.ant-menu-light {
+  background: #ffffff !important;
+}
+
+.ant-menu-light .ant-menu-item-selected {
+  background-color: #eef2ff !important;
+  color: #4f46e5 !important;
+  font-weight: 700 !important;
+}
+
+.ant-menu-light .ant-menu-item {
+  border-radius: 8px !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Base Page Styling */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f8fafc;
+  color: #334155;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Fix 5: Ant Design Table Zebra Striping & Alternating Rows */
+.ant-table-thead > tr > th {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.025em !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+.ant-table-tbody > tr:nth-child(even) > td {
+  background-color: #f8fafc !important;
+}
+
+.ant-table-tbody > tr:nth-child(odd) > td {
+  background-color: #ffffff !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #eef2ff !important;
+}
+
+.ant-table {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+/* Fix 6: Ant Design Notification Top-Right Styling & Elevation */
+.ant-notification-notice {
+  border-radius: 8px !important;
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.12), 0 4px 6px -4px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 12px 16px !important;
+}
+
+/* Fix 7: Ensure Ant Design InputNumber elements always span 100% width of parent container */
+.ant-input-number,
+.ant-input-number-group-wrapper {
+  width: 100% !important;
+}
+
+
+
+
