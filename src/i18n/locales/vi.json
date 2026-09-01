@@ -196,7 +196,16 @@
     "description": "Mô Tả Kỹ Thuật Chi Tiết",
     "image": "Hình Ảnh Phụ Tùng",
     "deleteConfirm": "Xóa phụ tùng này khỏi danh mục?",
-    "specs": "Thông Số Kỹ Thuật"
+    "specs": "Thông Số Kỹ Thuật",
+    "categoryName": "Danh Mục Phụ Tùng",
+    "listPrice": "Giá Niêm Yết",
+    "currentStock": "Tồn Kho Khả Dụng",
+    "supplierInfos": "Danh Sách Nhà Cung Cấp & Mã NCC",
+    "weight": "Trọng Lượng (kg)",
+    "volume": "Thể Tích (m³)",
+    "substitutes": "Mã Phụ Tùng Thay Thế Tương Đương",
+    "documents": "Bản Vẽ & Catalog PDF",
+    "location": "Vị Trí Lưu Kho (Kệ/Ngăn)"
   },
   "inventory": {
     "title": "Quản Lý Tồn Kho Phụ Tùng",
@@ -219,7 +228,8 @@
     "reference": "Số Phiếu / Mã Phụ Tùng",
     "type": "Loại Biến Động",
     "moves": "Lịch Sử Thao Tác Kho",
-    "history": "Lịch Sử Thao Tác Kho"
+    "history": "Lịch Sử Thao Tác Kho",
+    "stockMoves": "Nhật Ký Kho"
   },
   "purchases": {
     "title": "Quản Lý Đơn Mua Hàng (Purchase Orders - PO)",
@@ -286,7 +296,7 @@
     "payments": "Phiếu Thu / Chi & Quỹ",
     "journalEntries": "Sổ Nhật Ký Bút Toán",
     "chartOfAccounts": "Hệ Thống Tài Khoản (TT200)",
-    "reports": "Báo Cáo Tài Chính Real-time",
+    "reports": "Báo Cáo Tài Chính",
     "seedAccounts": "Nạp Hệ Thống Tài Khoản Mẫu (TT200)",
     "invoiceNumber": "Số Hóa Đơn",
     "type": "Loại Hóa Đơn / Phiếu",
@@ -382,6 +392,7 @@
     "totalOrders": "Đơn Hàng Xuất Bán",
     "totalPurchases": "Đơn Nhập Thu Mua",
     "totalProducts": "Danh Mục Phụ Tùng",
+    "totalSuppliers": "Danh Bạ Nhà Cung Cấp",
     "recentOrders": "Đơn Bán Hàng Mới Nhất",
     "recentPurchases": "Đơn Mua Hàng Mới Nhất",
     "lowStockAlerts": "Cảnh Báo Phụ Tùng Sắp Hết Hàng",

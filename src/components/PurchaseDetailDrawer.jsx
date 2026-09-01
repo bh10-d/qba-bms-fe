@@ -33,6 +33,30 @@ import { accountingApi } from '../api/accountingApi';
 
 const { Text } = Typography;
 
+const cleanChatterText = (text) => {
+  if (!text) return '';
+  if (typeof text !== 'string') return String(text);
+
+  let clean = text
+    .replace(/-&gt;/g, ' → ')
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+
+  clean = clean.replace(/<[^>]*>?/gm, '');
+
+  return clean
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 const PurchaseDetailDrawer = ({
   open,
   onClose,
@@ -322,8 +346,10 @@ const PurchaseDetailDrawer = ({
                 items={logs.map((log) => ({
                   color: 'blue',
                   content: (
-                    <div className="flex flex-col gap-1 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-100 mb-1">
-                      <div className="text-slate-700 font-medium">{log.body || log.message || log.note || 'Log'}</div>
+                    <div className="flex flex-col gap-1 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-100 mb-1 text-left">
+                      <div className="text-slate-800 font-medium text-left leading-relaxed break-words">
+                        {cleanChatterText(log.body || log.message || log.note || 'Log')}
+                      </div>
                     </div>
                   ),
                 }))}

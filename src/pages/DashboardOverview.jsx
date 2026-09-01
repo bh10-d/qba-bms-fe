@@ -10,7 +10,8 @@ import {
   Typography,
   Progress,
   Collapse,
-  Empty
+  Empty,
+  Space
 } from 'antd';
 import {
   UserOutlined,
@@ -32,12 +33,15 @@ import {
   ClockCircleOutlined,
   ShopOutlined,
   BankOutlined,
-  BoxPlotOutlined
+  BoxPlotOutlined,
+  WarningOutlined,
+  FileTextOutlined,
+  SlidersOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth, getRoleCode } from '../context/AuthContext';
-import { dashboardApi } from '../api/modulesApi';
+import { dashboardApi, productsApi, purchasesApi } from '../api/modulesApi';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -56,14 +60,15 @@ const DashboardOverview = () => {
   const navigate = useNavigate();
 
   const currentRole = getRoleCode(user);
-  const roleColor = ROLE_COLORS[currentRole] || 'blue';
   const isSuperAdmin = currentRole === 'SUPERADMIN';
-  const isAdminOrSuper = isSuperAdmin || currentRole === 'ADMIN';
 
   const canViewRevenue = hasLevel(60);
 
   const [loading, setLoading] = useState(false);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [pendingPurchases, setPendingPurchases] = useState([]);
+  const [allPurchasesList, setAllPurchasesList] = useState([]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -71,6 +76,31 @@ const DashboardOverview = () => {
       const res = await dashboardApi.getStats();
       const resData = res?.data || res;
       setDashboardStats(resData?.data || resData);
+
+      // Fetch Low stock products & pending POs & all POs for cost sum
+      const [pRes, poRes, allPoRes] = await Promise.allSettled([
+        productsApi.getAll({ limit: 50 }),
+        purchasesApi.getAll({ status: 'CONFIRMED' }),
+        purchasesApi.getAll({ limit: 100 }),
+      ]);
+
+      if (pRes.status === 'fulfilled') {
+        const d = pRes.value?.data || pRes.value;
+        const list = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []);
+        setLowStockProducts(list.filter((p) => (p.currentStock ?? p.qtyOnHand ?? 0) < 10).slice(0, 5));
+      }
+
+      if (poRes.status === 'fulfilled') {
+        const d = poRes.value?.data || poRes.value;
+        const list = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []);
+        setPendingPurchases(list.slice(0, 5));
+      }
+
+      if (allPoRes.status === 'fulfilled') {
+        const d = allPoRes.value?.data !== undefined ? allPoRes.value.data : allPoRes.value;
+        const list = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : (Array.isArray(d?.items) ? d.items : []));
+        setAllPurchasesList(list);
+      }
     } catch (err) {
       console.warn('Fetch dashboard data error:', err);
     } finally {
@@ -85,16 +115,25 @@ const DashboardOverview = () => {
   const financials = dashboardStats?.financials || {};
   const counts = dashboardStats?.counts || {};
   const allMonthlyChart = Array.isArray(dashboardStats?.monthlyRevenueChart) ? dashboardStats.monthlyRevenueChart : [];
-
-  const monthlyRevenueChart = allMonthlyChart.slice(-5);
+  const monthlyRevenueChart = allMonthlyChart.slice(-6);
 
   const recentOrders = (Array.isArray(dashboardStats?.recentOrders) ? dashboardStats.recentOrders : []).slice(0, 5);
   const recentPurchases = (Array.isArray(dashboardStats?.recentPurchases) ? dashboardStats.recentPurchases : []).slice(0, 5);
+
+  const rawPurchaseCost = financials.totalPurchaseCost ?? financials.totalPurchasesCost ?? financials.totalPurchaseAmount ?? financials.totalPurchasesAmount ?? dashboardStats?.totalPurchaseCost ?? dashboardStats?.totalPurchaseAmount;
+  const computedFromPoList = allPurchasesList.reduce((acc, po) => acc + Number(po.totalAmount ?? po.amountTotal ?? po.total ?? 0), 0);
+  const realTotalPurchaseCost = (rawPurchaseCost !== undefined && rawPurchaseCost !== null && Number(rawPurchaseCost) > 0)
+    ? Number(rawPurchaseCost)
+    : (computedFromPoList > 0 ? computedFromPoList : (pendingPurchases.length > 0 ? pendingPurchases : recentPurchases).reduce((acc, po) => acc + Number(po.totalAmount ?? po.total ?? 0), 0));
 
   const formatMonthLabel = (mStr) => {
     if (!mStr) return 'N/A';
     const [year, month] = mStr.split('-');
     return month ? `${month}/${year}` : mStr;
+  };
+
+  const formatVND = (val) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(val || 0));
   };
 
   return (
@@ -116,21 +155,22 @@ const DashboardOverview = () => {
               </span>
             </div>
             <h1 className="text-lg sm:text-xl font-extrabold text-white m-0 tracking-tight">
-              {t('dashboard.welcome')}, {user?.fullName || user?.name || user?.email || 'Quản trị viên'} 👋
+              {t('dashboard.welcome')}, {user?.fullName || user?.name || user?.email || 'Quản trị viên'}
             </h1>
             <p className="text-indigo-200 text-xs mt-0.5 m-0 max-w-xl">
               {t('dashboard.overviewTitle')}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Quick Action Buttons */}
+          <Space wrap className="z-10">
             <Button
-              icon={<ReloadOutlined />}
-              onClick={fetchDashboardData}
-              loading={loading}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-semibold text-xs"
+              type="primary"
+              icon={<ShoppingCartOutlined />}
+              onClick={() => navigate('/dashboard/orders')}
+              className="bg-emerald-600 hover:bg-emerald-500 font-bold shadow-2xs text-xs border-0"
             >
-              {t('common.reload')}
+              Tạo Báo Giá Bán
             </Button>
             <Button
               type="primary"
@@ -138,9 +178,16 @@ const DashboardOverview = () => {
               onClick={() => navigate('/dashboard/purchases')}
               className="bg-indigo-500 hover:bg-indigo-400 font-bold shadow-2xs text-xs border-0"
             >
-              {t('purchases.createNew')}
+              Tạo Đơn Mua PO
             </Button>
-          </div>
+            <Button
+              icon={<SlidersOutlined />}
+              onClick={() => navigate('/dashboard/inventory')}
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-semibold text-xs"
+            >
+              Điều Chỉnh Kho
+            </Button>
+          </Space>
         </div>
       </div>
 
@@ -200,14 +247,12 @@ const DashboardOverview = () => {
               title={<span className="text-[11px] text-slate-500 font-extrabold uppercase">{t('dashboard.totalPurchases')}</span>}
               value={counts.totalPurchases || 0}
               prefix={<ShoppingOutlined className="text-amber-600 mr-1.5 text-lg" />}
-              styles={{ content: { color: '#d97706', fontWeight: 900, fontSize: '18px' } }}
+              styles={{ content: { color: '#1e293b', fontWeight: 900, fontSize: '18px' } }}
             />
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between pt-1.5 border-t border-slate-100">
-              <span className="text-amber-700 font-semibold">
-                {canViewRevenue ? `${(Number(financials.totalPurchases || 0) / 1e9).toFixed(2)}B đ` : `${counts.totalSuppliers || 0} ${t('suppliers.title')}`}
-              </span>
+              <span className="text-amber-600 font-bold">{formatVND(realTotalPurchaseCost)}</span>
               <Button type="link" size="small" onClick={() => navigate('/dashboard/purchases')} className="p-0 h-auto text-[11px] font-bold">
-                {t('common.view')} &rarr;
+                {t('common.details')} &rarr;
               </Button>
             </div>
           </Card>
@@ -215,291 +260,156 @@ const DashboardOverview = () => {
 
         <Col xs={24} sm={12} lg={6}>
           <Card className="rounded-xl border-slate-200 shadow-2xs hover:shadow-xs transition-all bg-white" size="small">
-            {canViewRevenue ? (
-              <Statistic
-                title={<span className="text-[11px] text-slate-500 font-extrabold uppercase">{t('inventory.title')}</span>}
-                value={financials.inventoryValue || 0}
-                precision={0}
-                suffix="đ"
-                formatter={(val) => Number(val).toLocaleString()}
-                prefix={<BankOutlined className="text-purple-600 mr-1.5 text-lg" />}
-                styles={{ content: { color: '#7c3aed', fontWeight: 900, fontFamily: 'monospace', fontSize: '18px' } }}
-              />
-            ) : (
-              <Statistic
-                title={<span className="text-[11px] text-slate-500 font-extrabold uppercase">{t('suppliers.title')}</span>}
-                value={`${counts.totalSuppliers || 0}`}
-                prefix={<ShopOutlined className="text-purple-600 mr-1.5 text-lg" />}
-                styles={{ content: { color: '#7c3aed', fontWeight: 900, fontSize: '16px' } }}
-              />
-            )}
+            <Statistic
+              title={<span className="text-[11px] text-slate-500 font-extrabold uppercase">{t('dashboard.totalSuppliers')}</span>}
+              value={counts.totalSuppliers || 0}
+              prefix={<ShopOutlined className="text-purple-600 mr-1.5 text-lg" />}
+              styles={{ content: { color: '#1e293b', fontWeight: 900, fontSize: '18px' } }}
+            />
             <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between pt-1.5 border-t border-slate-100">
-              <span className="text-purple-700 font-bold">
-                {counts.totalSuppliers || 0} NCC • {counts.totalCustomers || 0} Khách
-              </span>
-              <Button type="link" size="small" onClick={() => navigate('/dashboard/inventory')} className="p-0 h-auto text-[11px] font-bold text-purple-700">
-                {t('menu.inventory')} &rarr;
+              <span className="text-purple-600 font-bold">Danh bạ NCC</span>
+              <Button type="link" size="small" onClick={() => navigate('/dashboard/suppliers')} className="p-0 h-auto text-[11px] font-bold">
+                {t('common.details')} &rarr;
               </Button>
             </div>
           </Card>
         </Col>
       </Row>
 
-      {/* 3. Quick Action Shortcut Toolbar */}
-      <Card title={<span className="font-bold text-slate-900 text-xs flex items-center gap-1.5"><ThunderboltOutlined className="text-amber-500" /> {t('dashboard.quickActions')}</span>} size="small" className="rounded-xl border-slate-200 shadow-2xs bg-white">
-        <Row gutter={[12, 12]}>
-          <Col xs={24} sm={12} md={6}>
-            <div
-              onClick={() => navigate('/dashboard/purchases')}
-              className="p-3 rounded-lg border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 transition-all cursor-pointer flex items-center gap-2.5 group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shrink-0">
-                <ShoppingOutlined className="text-sm" />
-              </div>
-              <div className="overflow-hidden">
-                <div className="font-bold text-slate-900 text-xs truncate group-hover:text-indigo-600">{t('purchases.createNew')}</div>
-                <div className="text-[10px] text-slate-500 truncate">{t('purchases.title')}</div>
-              </div>
-            </div>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <div
-              onClick={() => navigate('/dashboard/orders')}
-              className="p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer flex items-center gap-2.5 group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-                <ShoppingCartOutlined className="text-sm" />
-              </div>
-              <div className="overflow-hidden">
-                <div className="font-bold text-slate-900 text-xs truncate group-hover:text-emerald-600">{t('orders.createNew')}</div>
-                <div className="text-[10px] text-slate-500 truncate">{t('orders.title')}</div>
-              </div>
-            </div>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <div
-              onClick={() => navigate('/dashboard/inventory')}
-              className="p-3 rounded-lg border border-slate-200 hover:border-sky-500 hover:bg-sky-50/40 transition-all cursor-pointer flex items-center gap-2.5 group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold shrink-0">
-                <InboxOutlined className="text-sm" />
-              </div>
-              <div className="overflow-hidden">
-                <div className="font-bold text-slate-900 text-xs truncate group-hover:text-sky-600">{t('inventory.title')}</div>
-                <div className="text-[10px] text-slate-500 truncate">{t('inventory.adjustStock')}</div>
-              </div>
-            </div>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <div
-              onClick={() => navigate('/dashboard/labels')}
-              className="p-3 rounded-lg border border-slate-200 hover:border-purple-500 hover:bg-purple-50/40 transition-all cursor-pointer flex items-center gap-2.5 group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
-                <QrcodeOutlined className="text-sm" />
-              </div>
-              <div className="overflow-hidden">
-                <div className="font-bold text-slate-900 text-xs truncate group-hover:text-purple-600">{t('labels.title')}</div>
-                <div className="text-[10px] text-slate-500 truncate">{t('labels.generate')}</div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* 4. Monthly Trend vs Activity */}
+      {/* 3. Monthly Revenue Trend Chart & Low Stock Alert */}
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={14}>
           <Card
-            title={<span className="font-bold text-slate-900 text-xs">{t('dashboard.overviewTitle')}</span>}
-            size="small"
-            className="rounded-xl border-slate-200 shadow-2xs h-full bg-white"
+            title={
+              <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <RiseOutlined className="text-emerald-600" /> Biểu Đồ Doanh Thu & Chi Phí Nhập Hàng
+              </span>
+            }
+            className="rounded-xl border-slate-200 shadow-xs h-full"
           >
             {monthlyRevenueChart.length > 0 ? (
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between text-slate-500 text-[11px] pb-1.5 border-b border-slate-100 font-bold uppercase">
-                  <span className="w-24">Month</span>
-                  <span className="flex-1 text-center">{t('dashboard.totalRevenue')}</span>
-                  <span className="flex-1 text-center">{t('purchases.totalAmount')}</span>
-                </div>
+              <div className="flex flex-col gap-4 py-2">
+                {monthlyRevenueChart.map((m) => {
+                  const rev = m.revenue || 0;
+                  const cost = m.purchaseCost || 0;
+                  const maxVal = Math.max(...monthlyRevenueChart.map((item) => Math.max(item.revenue || 0, item.purchaseCost || 0)), 1);
+                  const revPercent = Math.min(Math.round((rev / maxVal) * 100), 100);
+                  const costPercent = Math.min(Math.round((cost / maxVal) * 100), 100);
 
-                {monthlyRevenueChart.map((row, idx) => {
-                  const rev = Number(row.revenue || 0);
-                  const purch = Number(row.purchases || 0);
                   return (
-                    <div key={idx} className="p-2 rounded-lg bg-slate-50/70 hover:bg-slate-100/80 transition-all flex items-center justify-between">
-                      <span className="font-bold text-slate-800 w-24">{formatMonthLabel(row.month)}</span>
-                      <span className="font-mono text-emerald-600 font-bold flex-1 text-center text-xs">
-                        {rev > 0 ? `${rev.toLocaleString()} đ` : '0 đ'}
-                      </span>
-                      <span className="font-mono text-indigo-600 font-semibold flex-1 text-center text-xs">
-                        {purch > 0 ? `${purch.toLocaleString()} đ` : '0 đ'}
-                      </span>
+                    <div key={m.month} className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-mono font-bold text-slate-800">{formatMonthLabel(m.month)}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-emerald-600">Bán: {formatVND(rev)}</span>
+                          <span className="font-mono text-amber-600">Mua: {formatVND(cost)}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Progress percent={revPercent} strokeColor="#059669" showInfo={false} size="small" />
+                        <Progress percent={costPercent} strokeColor="#d97706" showInfo={false} size="small" />
+                      </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Đang cập nhật dữ liệu doanh thu" />
             )}
           </Card>
         </Col>
 
+        {/* Low Stock Alert Widget */}
         <Col xs={24} lg={10}>
           <Card
-            title={<span className="font-bold text-slate-900 text-xs">{t('inventory.title')}</span>}
-            size="small"
-            className="rounded-xl border-slate-200 shadow-2xs h-full bg-white"
+            title={
+              <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <WarningOutlined className="text-amber-500" /> Cảnh Báo Tồn Kho Sắp Hết (&lt; 10 Cái)
+              </span>
+            }
+            extra={
+              <Button type="link" size="small" onClick={() => navigate('/dashboard/products')} className="p-0 text-xs font-bold">
+                Tất cả &rarr;
+              </Button>
+            }
+            className="rounded-xl border-slate-200 shadow-xs h-full"
           >
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center gap-2">
-                <BoxPlotOutlined className="text-indigo-600 text-lg" />
-                <div>
-                  <div className="text-[10px] text-slate-500 font-bold">{t('products.title')}</div>
-                  <div className="font-mono font-black text-indigo-900 text-sm">{counts.totalProducts || 0}</div>
-                </div>
+            {lowStockProducts.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {lowStockProducts.map((p) => (
+                  <div key={p.id} className="p-2.5 bg-amber-50/60 border border-amber-100 rounded-lg flex items-center justify-between gap-2">
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="font-bold text-xs text-slate-900 truncate">{p.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">Mã: {p.defaultCode || p.barcode || 'N/A'}</span>
+                    </div>
+                    <Tag color="red" className="font-bold text-xs shrink-0">
+                      Tồn: {p.currentStock ?? p.qtyOnHand ?? 0} {p.unit || 'Cái'}
+                    </Tag>
+                  </div>
+                ))}
               </div>
-
-              <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-100 flex items-center gap-2">
-                <InboxOutlined className="text-emerald-600 text-lg" />
-                <div>
-                  <div className="text-[10px] text-slate-500 font-bold">{t('inventory.quantity')}</div>
-                  <div className="font-mono font-black text-emerald-900 text-sm">{Number(counts.totalStockItems || 0).toLocaleString()}</div>
-                </div>
+            ) : (
+              <div className="py-6 text-center text-slate-400 text-xs">
+                <CheckCircleOutlined className="text-emerald-500 text-2xl mb-1 block" />
+                Tất cả sản phẩm đều đủ số lượng tồn kho khả dụng
               </div>
-
-              <div className="p-2.5 rounded-lg bg-sky-50/70 border border-sky-100 flex items-center gap-2">
-                <ShoppingCartOutlined className="text-sky-600 text-lg" />
-                <div>
-                  <div className="text-[10px] text-slate-500 font-bold">{t('orders.title')}</div>
-                  <div className="font-mono font-black text-sky-900 text-sm">{counts.totalOrders || 0}</div>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-amber-50/70 border border-amber-100 flex items-center gap-2">
-                <ShoppingOutlined className="text-amber-600 text-lg" />
-                <div>
-                  <div className="text-[10px] text-slate-500 font-bold">{t('purchases.title')}</div>
-                  <div className="font-mono font-black text-amber-900 text-sm">{counts.totalPurchases || 0}</div>
-                </div>
-              </div>
-            </div>
+            )}
           </Card>
         </Col>
       </Row>
 
-      {/* 5. Recent Activity */}
+      {/* 4. Pending POs & Recent Orders */}
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={12}>
           <Card
-            title={<span className="font-bold text-slate-900 text-xs flex items-center gap-1.5"><ShoppingCartOutlined className="text-emerald-600" /> {t('dashboard.recentOrders')}</span>}
-            size="small"
-            extra={
-              <Button type="link" onClick={() => navigate('/dashboard/orders')} className="p-0 font-bold text-xs">
-                {t('common.view')} &rarr;
-              </Button>
+            title={
+              <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <ShoppingOutlined className="text-indigo-600" /> Đơn Mua Hàng Chờ Tiếp Nhận (Pending POs)
+              </span>
             }
-            className="rounded-xl border-slate-200 shadow-2xs bg-white"
+            className="rounded-xl border-slate-200 shadow-xs"
           >
-            {recentOrders.length > 0 ? (
-              <Table
-                dataSource={recentOrders}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                columns={[
-                  {
-                    title: t('orders.reference'),
-                    dataIndex: 'orderNumber',
-                    key: 'orderNumber',
-                    render: (num, r) => (
-                      <span className="font-mono font-bold text-emerald-700 text-xs">{num || `S-${r.id?.slice(0, 5)}`}</span>
-                    ),
-                  },
-                  {
-                    title: t('orders.customer'),
-                    dataIndex: 'customerName',
-                    key: 'customerName',
-                    render: (c) => <span className="font-bold text-slate-800 text-xs">{c || 'Retail'}</span>,
-                  },
-                  {
-                    title: t('orders.amount'),
-                    key: 'totalAmount',
-                    render: (_, r) => (
-                      <span className="font-mono font-bold text-emerald-600 text-xs">
-                        {Number(r.totalAmount || 0).toLocaleString()} đ
-                      </span>
-                    ),
-                  },
-                  {
-                    title: t('common.status'),
-                    dataIndex: 'status',
-                    key: 'status',
-                    render: (st) => <Tag color={st === 'CONFIRMED' ? 'green' : 'default'} className="font-bold text-[10px]">{st}</Tag>,
-                  },
-                ]}
-              />
-            ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />
-            )}
+            <Table
+              dataSource={pendingPurchases.length > 0 ? pendingPurchases : recentPurchases}
+              rowKey={(r, idx) => r.id || idx}
+              pagination={false}
+              size="small"
+              locale={{
+                emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có đơn mua hàng (PO)" />,
+              }}
+              columns={[
+                { title: 'Mã PO', dataIndex: 'poNumber', key: 'poNumber', render: (po, r) => <span className="font-mono font-bold text-indigo-700 text-xs">{po || r.name || 'N/A'}</span> },
+                { title: 'Nhà Cung Cấp', dataIndex: 'supplierName', key: 'supplierName', render: (s, r) => <span className="font-bold text-xs text-slate-800">{s || r.supplier?.name || 'N/A'}</span> },
+                { title: 'Trạng Thái', dataIndex: 'status', key: 'status', render: (st) => st ? <Tag color="amber" className="font-bold text-[10px]">{st}</Tag> : <span className="text-[10px] text-slate-400">N/A</span> },
+              ]}
+            />
           </Card>
         </Col>
 
         <Col xs={24} lg={12}>
           <Card
-            title={<span className="font-bold text-slate-900 text-xs flex items-center gap-1.5"><ShoppingOutlined className="text-indigo-600" /> {t('dashboard.recentPurchases')}</span>}
-            size="small"
-            extra={
-              <Button type="link" onClick={() => navigate('/dashboard/purchases')} className="p-0 font-bold text-xs">
-                {t('common.view')} &rarr;
-              </Button>
+            title={
+              <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <ShoppingCartOutlined className="text-emerald-600" /> Đơn Bán Hàng Mới Nhất
+              </span>
             }
-            className="rounded-xl border-slate-200 shadow-2xs bg-white"
+            className="rounded-xl border-slate-200 shadow-xs"
           >
-            {recentPurchases.length > 0 ? (
-              <Table
-                dataSource={recentPurchases}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                columns={[
-                  {
-                    title: t('purchases.reference'),
-                    dataIndex: 'poNumber',
-                    key: 'poNumber',
-                    render: (po, r) => (
-                      <span className="font-mono font-bold text-indigo-700 text-xs">{po || `PO-${r.id?.slice(0, 5)}`}</span>
-                    ),
-                  },
-                  {
-                    title: t('purchases.supplier'),
-                    dataIndex: 'supplierName',
-                    key: 'supplierName',
-                    render: (s) => <span className="font-bold text-slate-800 text-xs">{s || 'N/A'}</span>,
-                  },
-                  {
-                    title: t('purchases.amount'),
-                    key: 'totalAmount',
-                    render: (_, r) => (
-                      <span className="font-mono font-bold text-indigo-600 text-xs">
-                        {Number(r.totalAmount || 0).toLocaleString()} đ
-                      </span>
-                    ),
-                  },
-                  {
-                    title: t('common.status'),
-                    dataIndex: 'status',
-                    key: 'status',
-                    render: (st) => <Tag color={st === 'CONFIRMED' || st === 'DONE' ? 'green' : 'default'} className="font-bold text-[10px]">{st}</Tag>,
-                  },
-                ]}
-              />
-            ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />
-            )}
+            <Table
+              dataSource={recentOrders}
+              rowKey={(r, idx) => r.id || idx}
+              pagination={false}
+              size="small"
+              locale={{
+                emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có đơn bán hàng (SO)" />,
+              }}
+              columns={[
+                { title: 'Mã Đơn SO', dataIndex: 'orderNumber', key: 'orderNumber', render: (so, r) => <span className="font-mono font-bold text-indigo-700 text-xs">{so || r.name || 'N/A'}</span> },
+                { title: 'Khách Hàng', dataIndex: 'customerName', key: 'customerName', render: (c, r) => <span className="font-bold text-xs text-slate-800">{c || r.customer?.name || r.partnerName || 'N/A'}</span> },
+                { title: 'Tổng Tiền', dataIndex: 'totalAmount', key: 'totalAmount', align: 'right', render: (v, r) => <span className="font-mono font-bold text-emerald-600 text-xs">{formatVND(v ?? r.total)}</span> },
+              ]}
+            />
           </Card>
         </Col>
       </Row>

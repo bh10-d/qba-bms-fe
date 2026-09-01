@@ -11,6 +11,7 @@ const { Title, Text } = Typography;
 const EnginesPage = () => {
   const { t } = useTranslation();
   const [engines, setEngines] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
 
@@ -19,16 +20,19 @@ const EnginesPage = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchEngines = async () => {
+  const fetchEngines = async (p = 1, lim = 10, search = '') => {
     setLoading(true);
     try {
-      const res = await enginesApi.getAll();
-      const data = res?.data || res;
-      if (Array.isArray(data)) {
-        setEngines(data);
-      } else {
-        setEngines([]);
-      }
+      const params = { page: p, limit: lim };
+      if (search) params.search = search;
+
+      const res = await enginesApi.getAll(params);
+      const rawData = res?.data !== undefined ? res.data : res;
+      const list = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = res?.total ?? rawData?.total ?? list.length;
+
+      setEngines(list);
+      setPagination({ page: p, limit: lim, total: totalCount });
     } catch (err) {
       console.warn('API engines fetch failed:', err);
       setEngines([]);
@@ -38,16 +42,27 @@ const EnginesPage = () => {
   };
 
   useEffect(() => {
-    fetchEngines();
+    fetchEngines(1, 10, '');
   }, []);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      if (editingEngine) {
+        form.setFieldsValue({
+          name: editingEngine.name || editingEngine.title,
+          code: editingEngine.code,
+          capacity: editingEngine.capacity,
+          power: editingEngine.power,
+          description: editingEngine.description,
+        });
+      } else {
+        form.resetFields();
+      }
+    }
+  }, [isModalOpen, editingEngine, form]);
 
   const handleOpenModal = (record = null) => {
     setEditingEngine(record);
-    if (record) {
-      form.setFieldsValue(record);
-    } else {
-      form.resetFields();
-    }
     setIsModalOpen(true);
   };
 
@@ -140,22 +155,33 @@ const EnginesPage = () => {
       title: t('brands.name'),
       dataIndex: 'brand',
       key: 'brand',
-      render: (brand) => <Tag color="blue" className="font-semibold">{brand || 'Weichai'}</Tag>,
+      render: (brand, record) => {
+        const b = brand || record.brandName;
+        return b ? <Tag color="blue" className="font-semibold">{b}</Tag> : <span className="text-slate-400 text-xs">N/A</span>;
+      },
     },
     {
       title: t('engines.power'),
       key: 'power',
-      render: (_, record) => (
-        <span className="text-xs font-semibold text-slate-700">
-          {record.horsepower} • {record.capacity}
-        </span>
-      ),
+      render: (_, record) => {
+        const p = record.power || record.horsepower;
+        const c = record.capacity;
+        if (!p && !c) return <span className="text-slate-400 text-xs">N/A</span>;
+        return (
+          <span className="text-xs font-semibold text-slate-700">
+            {p ? `${p} HP` : ''} {p && c ? '•' : ''} {c || ''}
+          </span>
+        );
+      },
     },
     {
       title: t('engines.fuel'),
       dataIndex: 'emissionStandard',
       key: 'emissionStandard',
-      render: (std) => <Tag color="green" className="font-bold">{std || 'Euro 5'}</Tag>,
+      render: (std, record) => {
+        const text = std || record.description || record.fuel;
+        return text ? <Tag color="green" className="font-bold">{text}</Tag> : <span className="text-slate-400 text-xs">N/A</span>;
+      },
     },
     {
       title: t('common.action'),
@@ -241,7 +267,10 @@ const EnginesPage = () => {
             ),
           }}
           pagination={{
-            defaultPageSize: 10,
+            current: Number(pagination.page || 1),
+            pageSize: pagination.limit,
+            total: pagination.total,
+            onChange: (p, l) => fetchEngines(p, l, searchText),
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,

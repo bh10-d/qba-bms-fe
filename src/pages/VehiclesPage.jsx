@@ -13,6 +13,7 @@ const VehiclesPage = () => {
   const [vehicles, setVehicles] = useState([]);
   const [enginesList, setEnginesList] = useState([]);
   const [gearboxesList, setGearboxesList] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
 
@@ -21,16 +22,19 @@ const VehiclesPage = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchVehicles = async () => {
+  const fetchVehicles = async (p = 1, lim = 10, search = '') => {
     setLoading(true);
     try {
-      const res = await vehiclesApi.getAll();
-      const data = res?.data || res;
-      if (Array.isArray(data)) {
-        setVehicles(data);
-      } else {
-        setVehicles([]);
-      }
+      const params = { page: p, limit: lim };
+      if (search) params.search = search;
+
+      const res = await vehiclesApi.getAll(params);
+      const rawData = res?.data !== undefined ? res.data : res;
+      const list = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = res?.total ?? rawData?.total ?? list.length;
+
+      setVehicles(list);
+      setPagination({ page: p, limit: lim, total: totalCount });
     } catch (err) {
       console.warn('API vehicles fetch failed:', err);
       setVehicles([]);
@@ -56,28 +60,33 @@ const VehiclesPage = () => {
   };
 
   useEffect(() => {
-    fetchVehicles();
+    fetchVehicles(1, 10, '');
     fetchMetadata();
   }, []);
 
+  useEffect(() => {
+    if (isModalOpen) {
+      if (editingVehicle) {
+        form.setFieldsValue({
+          name: editingVehicle.name || editingVehicle.title,
+          modelCode: editingVehicle.modelCode || editingVehicle.code,
+          category: editingVehicle.category,
+          year: editingVehicle.year,
+          certificate: editingVehicle.certificate,
+          axle: editingVehicle.axle,
+          imageUrl: editingVehicle.imageUrl,
+          engineId: editingVehicle.engineId || editingVehicle.engine?.id,
+          gearboxId: editingVehicle.gearboxId || editingVehicle.gearbox?.id,
+          note: editingVehicle.note,
+        });
+      } else {
+        form.resetFields();
+      }
+    }
+  }, [isModalOpen, editingVehicle, form]);
+
   const handleOpenModal = (record = null) => {
     setEditingVehicle(record);
-    if (record) {
-      form.setFieldsValue({
-        name: record.name || record.title,
-        modelCode: record.modelCode || record.code,
-        category: record.category,
-        year: record.year,
-        certificate: record.certificate,
-        axle: record.axle,
-        imageUrl: record.imageUrl,
-        engineId: record.engineId || record.engine?.id,
-        gearboxId: record.gearboxId || record.gearbox?.id,
-        note: record.note,
-      });
-    } else {
-      form.resetFields();
-    }
     setIsModalOpen(true);
   };
 
@@ -204,20 +213,26 @@ const VehiclesPage = () => {
     {
       title: t('vehicles.category'),
       key: 'category',
-      render: (_, record) => (
-        <span className="text-xs font-semibold text-slate-700">
-          {record.category || 'Vehicle'} ({record.year || '2024'})
-        </span>
-      ),
+      render: (_, record) => {
+        if (!record.category && !record.year) return <span className="text-slate-400 text-xs">N/A</span>;
+        return (
+          <span className="text-xs font-semibold text-slate-700">
+            {record.category || ''} {record.year ? `(${record.year})` : ''}
+          </span>
+        );
+      },
     },
     {
       title: t('vehicles.axle'),
       key: 'axle',
-      render: (_, record) => (
-        <Tag color="purple" className="font-bold">
-          {record.axle || 'Axle'} • {record.certificate || 'Certificate'}
-        </Tag>
-      ),
+      render: (_, record) => {
+        if (!record.axle && !record.certificate) return <span className="text-slate-400 text-xs">N/A</span>;
+        return (
+          <Tag color="purple" className="font-bold">
+            {record.axle || ''} {record.axle && record.certificate ? '•' : ''} {record.certificate || ''}
+          </Tag>
+        );
+      },
     },
     {
       title: `${t('vehicles.engine')} & ${t('vehicles.gearbox')}`,
@@ -317,7 +332,10 @@ const VehiclesPage = () => {
             ),
           }}
           pagination={{
-            defaultPageSize: 10,
+            current: Number(pagination.page || 1),
+            pageSize: pagination.limit,
+            total: pagination.total,
+            onChange: (p, l) => fetchVehicles(p, l, searchText),
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
@@ -345,22 +363,22 @@ const VehiclesPage = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <Form.Item label={t('vehicles.code')} name="modelCode">
-              <Input placeholder="ZZ4257N3247N1" />
+              <Input placeholder="Ví dụ: ZZ4257N3247N1" />
             </Form.Item>
             <Form.Item label={t('vehicles.category')} name="category">
-              <Input placeholder="Tractor / Truck" />
+              <Input placeholder="Ví dụ: Xe đầu kéo / Xe tải" />
             </Form.Item>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <Form.Item label={t('vehicles.year')} name="year">
-              <Input placeholder="2024" />
+              <Input placeholder="Ví dụ: 2024" />
             </Form.Item>
             <Form.Item label={t('vehicles.certificate')} name="certificate">
-              <Input placeholder="Cert" />
+              <Input placeholder="Ví dụ: Giấy đăng kiểm" />
             </Form.Item>
             <Form.Item label={t('vehicles.axle')} name="axle">
-              <Input placeholder="HC16" />
+              <Input placeholder="Ví dụ: Cầu HC16" />
             </Form.Item>
           </div>
 

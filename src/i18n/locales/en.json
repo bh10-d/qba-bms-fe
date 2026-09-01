@@ -193,10 +193,19 @@
     "minStock": "Min Safety Stock",
     "maxStock": "Max Stock Threshold",
     "location": "Bin / Shelf Location",
-    "description": "Technical Specifications",
-    "image": "Part Image",
+    "description": "Technical Description",
+    "image": "Spare Part Image",
     "deleteConfirm": "Remove part from catalog?",
-    "specs": "Specifications"
+    "specs": "Specifications",
+    "categoryName": "Category Name",
+    "listPrice": "List Selling Price",
+    "currentStock": "Current Stock",
+    "supplierInfos": "Supplier List & Codes",
+    "weight": "Weight (kg)",
+    "volume": "Volume (m³)",
+    "substitutes": "Equivalent Substitute Parts",
+    "documents": "PDF Drawings & Catalogs",
+    "location": "Bin / Shelf Location"
   },
   "inventory": {
     "title": "Spare Parts Inventory",
@@ -219,7 +228,8 @@
     "reference": "Reference / Part Code",
     "type": "Movement Type",
     "moves": "Stock Movement Logs",
-    "history": "Stock Movement Logs"
+    "history": "Stock Movement Logs",
+    "stockMoves": "Stock Moves"
   },
   "purchases": {
     "title": "Purchase Orders (PO)",
@@ -286,7 +296,7 @@
     "payments": "Payments & Vouchers",
     "journalEntries": "General Journal Ledger",
     "chartOfAccounts": "Chart of Accounts (TT200)",
-    "reports": "Real-time Financial Reports",
+    "reports": "Financial Reports",
     "seedAccounts": "Seed Template Accounts (TT200)",
     "invoiceNumber": "Invoice Number",
     "type": "Invoice / Voucher Type",
@@ -382,6 +392,7 @@
     "totalOrders": "Sales Orders Out",
     "totalPurchases": "Purchase Orders In",
     "totalProducts": "Part Catalog SKUs",
+    "totalSuppliers": "Total Suppliers",
     "recentOrders": "Recent Sales Orders",
     "recentPurchases": "Recent Purchase Orders",
     "lowStockAlerts": "Low Stock Alerts",

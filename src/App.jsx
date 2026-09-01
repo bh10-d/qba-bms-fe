@@ -22,6 +22,7 @@ import InventoryPage from './pages/InventoryPage';
 import RolesManagementPage from './pages/RolesManagementPage';
 import UserManagementPage from './pages/UserManagementPage';
 import ApiConsolePage from './pages/ApiConsolePage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -155,6 +156,7 @@ function App() {
                     }
                   />
                   
+                  <Route path="audit-logs" element={<AuditLogsPage />} />
                   <Route path="profile" element={<ProfilePage />} />
                 </Route>
 

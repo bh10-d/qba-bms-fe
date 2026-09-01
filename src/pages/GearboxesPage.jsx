@@ -11,6 +11,7 @@ const { Title, Text } = Typography;
 const GearboxesPage = () => {
   const { t } = useTranslation();
   const [gearboxes, setGearboxes] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
 
@@ -19,16 +20,19 @@ const GearboxesPage = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchGearboxes = async () => {
+  const fetchGearboxes = async (p = 1, lim = 10, search = '') => {
     setLoading(true);
     try {
-      const res = await gearboxesApi.getAll();
-      const data = res?.data || res;
-      if (Array.isArray(data)) {
-        setGearboxes(data);
-      } else {
-        setGearboxes([]);
-      }
+      const params = { page: p, limit: lim };
+      if (search) params.search = search;
+
+      const res = await gearboxesApi.getAll(params);
+      const rawData = res?.data !== undefined ? res.data : res;
+      const list = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = res?.total ?? rawData?.total ?? list.length;
+
+      setGearboxes(list);
+      setPagination({ page: p, limit: lim, total: totalCount });
     } catch (err) {
       console.warn('API gearboxes fetch failed:', err);
       setGearboxes([]);
@@ -38,16 +42,26 @@ const GearboxesPage = () => {
   };
 
   useEffect(() => {
-    fetchGearboxes();
+    fetchGearboxes(1, 10, '');
   }, []);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      if (editingGearbox) {
+        form.setFieldsValue({
+          name: editingGearbox.name || editingGearbox.title,
+          imageUrl: editingGearbox.imageUrl,
+          brand: editingGearbox.brand || editingGearbox.brandName,
+          note: editingGearbox.note || editingGearbox.description,
+        });
+      } else {
+        form.resetFields();
+      }
+    }
+  }, [isModalOpen, editingGearbox, form]);
 
   const handleOpenModal = (record = null) => {
     setEditingGearbox(record);
-    if (record) {
-      form.setFieldsValue(record);
-    } else {
-      form.resetFields();
-    }
     setIsModalOpen(true);
   };
 
@@ -140,13 +154,19 @@ const GearboxesPage = () => {
       title: t('brands.name'),
       dataIndex: 'brand',
       key: 'brand',
-      render: (brand) => <Tag color="cyan" className="font-semibold">{brand || 'Sinotruk'}</Tag>,
+      render: (brand, record) => {
+        const b = brand || record.brandName;
+        return b ? <Tag color="cyan" className="font-semibold">{b}</Tag> : <span className="text-slate-400 text-xs">N/A</span>;
+      },
     },
     {
       title: t('gearboxes.speeds'),
-      dataIndex: 'category',
-      key: 'category',
-      render: (cat) => <span className="text-xs font-semibold text-slate-700">{cat || '10 speeds'}</span>,
+      dataIndex: 'note',
+      key: 'note',
+      render: (note, record) => {
+        const text = note || record.category || record.description;
+        return text ? <span className="text-xs font-semibold text-slate-700">{text}</span> : <span className="text-slate-400 text-xs">N/A</span>;
+      },
     },
     {
       title: t('common.action'),
@@ -232,7 +252,10 @@ const GearboxesPage = () => {
             ),
           }}
           pagination={{
-            defaultPageSize: 10,
+            current: Number(pagination.page || 1),
+            pageSize: pagination.limit,
+            total: pagination.total,
+            onChange: (p, l) => fetchGearboxes(p, l, searchText),
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
@@ -259,11 +282,11 @@ const GearboxesPage = () => {
           </Form.Item>
 
           <Form.Item label={t('brands.name')} name="brand">
-            <Input placeholder="Sinotruk" />
+            <Input placeholder="Ví dụ: FAST GEAR / Sinotruk" />
           </Form.Item>
 
           <Form.Item label={t('gearboxes.description')} name="note">
-            <Input.TextArea rows={2} placeholder="..." />
+            <Input.TextArea rows={2} placeholder="Nhập ghi chú kỹ thuật..." />
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-6">

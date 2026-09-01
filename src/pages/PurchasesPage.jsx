@@ -79,13 +79,13 @@ const PurchasesPage = () => {
       if (status) params.status = status;
 
       const res = await purchasesApi.getAll(params);
-      const rawData = res?.data || res;
+      const rawData = res?.data !== undefined ? res.data : res;
 
       const itemsList = Array.isArray(rawData)
         ? rawData
         : (Array.isArray(rawData?.data) ? rawData.data : (Array.isArray(rawData?.items) ? rawData.items : []));
 
-      const totalCount = rawData?.total ?? rawData?.totalCount ?? itemsList.length;
+      const totalCount = res?.total ?? rawData?.total ?? rawData?.totalCount ?? itemsList.length;
 
       setPurchases(itemsList);
       setPagination({ page, limit, total: totalCount });

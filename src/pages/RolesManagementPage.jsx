@@ -22,6 +22,7 @@ const RolesManagementPage = () => {
   const isSuperAdmin = currentRole === 'SUPERADMIN';
 
   const [roles, setRoles] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
 
@@ -32,18 +33,21 @@ const RolesManagementPage = () => {
 
   const isWriteAllowed = hasRole(['SUPERADMIN', 'ADMIN']);
 
-  const fetchRoles = async () => {
+  const fetchRoles = async (p = 1, lim = 10, search = '') => {
     setLoading(true);
     try {
-      const res = await rolesApi.getAll();
-      const data = res?.data || res;
-      if (Array.isArray(data)) {
-        setRoles(data);
-      } else {
-        setRoles([]);
-      }
+      const params = { page: p, limit: lim };
+      if (search) params.search = search;
+
+      const res = await rolesApi.getAll(params);
+      const rawData = res?.data !== undefined ? res.data : res;
+      const list = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = res?.total ?? rawData?.total ?? list.length;
+
+      setRoles(list);
+      setPagination({ page: p, limit: lim, total: totalCount });
     } catch (err) {
-      console.warn('API /roles fetch failed:', err);
+      console.warn('API roles fetch failed:', err);
       setRoles([]);
     } finally {
       setLoading(false);
@@ -51,7 +55,7 @@ const RolesManagementPage = () => {
   };
 
   useEffect(() => {
-    fetchRoles();
+    fetchRoles(1, 10, '');
   }, []);
 
   const handleOpenModal = (record = null) => {
@@ -254,7 +258,10 @@ const RolesManagementPage = () => {
           rowKey="id"
           loading={loading}
           pagination={{
-            defaultPageSize: 10,
+            current: Number(pagination.page || 1),
+            pageSize: pagination.limit,
+            total: pagination.total,
+            onChange: (p, l) => fetchRoles(p, l, searchText),
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,

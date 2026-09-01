@@ -12,6 +12,7 @@ const BrandsPage = () => {
   const { t } = useTranslation();
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL'); // 'ALL' | 'HAS_PRODUCTS' | 'NO_PRODUCTS'
 
@@ -20,16 +21,19 @@ const BrandsPage = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchBrands = async () => {
+  const fetchBrands = async (p = 1, lim = 10, search = '') => {
     setLoading(true);
     try {
-      const res = await brandsApi.getAll();
-      const data = res?.data || res;
-      if (Array.isArray(data)) {
-        setBrands(data);
-      } else {
-        setBrands([]);
-      }
+      const params = { page: p, limit: lim };
+      if (search) params.search = search;
+
+      const res = await brandsApi.getAll(params);
+      const rawData = res?.data !== undefined ? res.data : res;
+      const list = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = res?.total ?? rawData?.total ?? list.length;
+
+      setBrands(list);
+      setPagination({ page: p, limit: lim, total: totalCount });
     } catch (err) {
       console.warn('API brands fetch failed:', err);
       setBrands([]);
@@ -39,16 +43,21 @@ const BrandsPage = () => {
   };
 
   useEffect(() => {
-    fetchBrands();
+    fetchBrands(1, 10, '');
   }, []);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      if (editingBrand) {
+        form.setFieldsValue({ name: editingBrand.name, logoUrl: editingBrand.logoUrl });
+      } else {
+        form.resetFields();
+      }
+    }
+  }, [isModalOpen, editingBrand, form]);
 
   const handleOpenModal = (record = null) => {
     setEditingBrand(record);
-    if (record) {
-      form.setFieldsValue({ name: record.name, logoUrl: record.logoUrl });
-    } else {
-      form.resetFields();
-    }
     setIsModalOpen(true);
   };
 
@@ -409,7 +418,10 @@ const BrandsPage = () => {
             rowExpandable: (record) => Array.isArray(record.products) && record.products.length > 0,
           }}
           pagination={{
-            defaultPageSize: 10,
+            current: Number(pagination.page || 1),
+            pageSize: pagination.limit,
+            total: pagination.total,
+            onChange: (p, l) => fetchBrands(p, l, searchText),
             pageSizeOptions: ['10', '20', '50', '100'],
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,

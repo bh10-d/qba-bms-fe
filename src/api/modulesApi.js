@@ -2,7 +2,7 @@ import axiosClient from './axiosClient';
 
 // Roles API (/api/v1/roles)
 export const rolesApi = {
-  getAll: () => axiosClient.get('/roles'),
+  getAll: (params) => axiosClient.get('/roles', { params }),
   getById: (id) => axiosClient.get(`/roles/${id}`),
   create: (data) => axiosClient.post('/roles', data),
   update: (id, data) => axiosClient.patch(`/roles/${id}`, data),
@@ -11,7 +11,7 @@ export const rolesApi = {
 
 // Brands API (/api/v1/brands)
 export const brandsApi = {
-  getAll: () => axiosClient.get('/brands'),
+  getAll: (params) => axiosClient.get('/brands', { params }),
   getById: (id) => axiosClient.get(`/brands/${id}`),
   create: (data) => axiosClient.post('/brands', data),
   update: (id, data) => axiosClient.patch(`/brands/${id}`, data),
@@ -20,7 +20,7 @@ export const brandsApi = {
 
 // Engines API (/api/v1/engines)
 export const enginesApi = {
-  getAll: () => axiosClient.get('/engines'),
+  getAll: (params) => axiosClient.get('/engines', { params }),
   getById: (id) => axiosClient.get(`/engines/${id}`),
   create: (data) => axiosClient.post('/engines', data),
   update: (id, data) => axiosClient.patch(`/engines/${id}`, data),
@@ -29,7 +29,7 @@ export const enginesApi = {
 
 // Gearboxes API (/api/v1/gearboxes)
 export const gearboxesApi = {
-  getAll: () => axiosClient.get('/gearboxes'),
+  getAll: (params) => axiosClient.get('/gearboxes', { params }),
   getById: (id) => axiosClient.get(`/gearboxes/${id}`),
   create: (data) => axiosClient.post('/gearboxes', data),
   update: (id, data) => axiosClient.patch(`/gearboxes/${id}`, data),
@@ -38,7 +38,7 @@ export const gearboxesApi = {
 
 // Vehicles API (/api/v1/vehicles)
 export const vehiclesApi = {
-  getAll: () => axiosClient.get('/vehicles'),
+  getAll: (params) => axiosClient.get('/vehicles', { params }),
   getById: (id) => axiosClient.get(`/vehicles/${id}`),
   create: (data) => axiosClient.post('/vehicles', data),
   update: (id, data) => axiosClient.patch(`/vehicles/${id}`, data),
@@ -47,7 +47,7 @@ export const vehiclesApi = {
 
 // Products API (/api/v1/products)
 export const productsApi = {
-  getAll: () => axiosClient.get('/products'),
+  getAll: (params) => axiosClient.get('/products', { params }),
   getById: (id) => axiosClient.get(`/products/${id}`),
   create: (data) => axiosClient.post('/products', data),
   update: (id, data) => axiosClient.patch(`/products/${id}`, data),
@@ -88,7 +88,7 @@ export const attachmentsApi = {
 
 // Users API (/api/v1/users)
 export const usersApi = {
-  getAll: () => axiosClient.get('/users'),
+  getAll: (params) => axiosClient.get('/users', { params }),
   getById: (id) => axiosClient.get(`/users/${id}`),
   create: (data) => axiosClient.post('/users', data),
   update: (id, data) => axiosClient.patch(`/users/${id}`, data),
@@ -112,6 +112,7 @@ export const purchasesApi = {
 
 // Audit Logs & Chatter API (/api/v1/audit-logs)
 export const auditLogsApi = {
+  getAll: (params) => axiosClient.get('/audit-logs', { params }),
   getByPoNumber: (poNumber) => axiosClient.get(`/audit-logs/purchase/${poNumber}`),
   getByEntity: (resModel, resId) => axiosClient.get('/audit-logs', { params: { resModel, resId } }),
 };
@@ -122,12 +123,16 @@ export const ordersApi = {
   getById: (id) => axiosClient.get(`/orders/${id}`),
   create: (data) => axiosClient.post('/orders', data),
   confirm: (id) => axiosClient.post(`/orders/${id}/confirm`),
+  ship: (id) => axiosClient.post(`/orders/${id}/ship`),
+  done: (id) => axiosClient.post(`/orders/${id}/done`),
   cancel: (id) => axiosClient.post(`/orders/${id}/cancel`),
+  exportPdf: (id) => axiosClient.get(`/orders/${id}/pdf`, { responseType: 'blob' }),
 };
 
 // Inventory & Real-time Stock API (/api/v1/inventory)
 export const inventoryApi = {
-  getStockMoves: () => axiosClient.get('/inventory/stock-moves'),
+  getValuation: () => axiosClient.get('/inventory/valuation'),
+  getStockMoves: (params) => axiosClient.get('/inventory/stock-moves', { params }),
   getProductStock: (productId) => axiosClient.get(`/inventory/product/${productId}`),
   adjustStock: (data) => axiosClient.post('/inventory/adjust', data),
 };
@@ -143,4 +148,3 @@ export const stockPickingsApi = {
 export const dashboardApi = {
   getStats: () => axiosClient.get('/dashboard'),
 };
-

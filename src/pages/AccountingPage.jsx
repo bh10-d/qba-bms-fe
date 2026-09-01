@@ -87,29 +87,63 @@ const AccountingPage = () => {
   const [paymentForm] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
+  const [invPagination, setInvPagination] = useState({ page: 1, limit: 10, total: 0 });
+  const [payPagination, setPayPagination] = useState({ page: 1, limit: 10, total: 0 });
+  const [jePagination, setJePagination] = useState({ page: 1, limit: 10, total: 0 });
+
+  const fetchInvoices = async (p = 1, lim = 10) => {
+    try {
+      const invRes = await accountingApi.getInvoices({ page: p, limit: lim });
+      const rawData = invRes?.data !== undefined ? invRes.data : invRes;
+      const invList = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = invRes?.total ?? rawData?.total ?? invList.length;
+      setInvoices(invList);
+      setInvPagination({ page: p, limit: lim, total: totalCount });
+    } catch (err) {
+      console.warn('fetchInvoices error:', err);
+    }
+  };
+
+  const fetchPayments = async (p = 1, lim = 10) => {
+    try {
+      const payRes = await accountingApi.getPayments({ page: p, limit: lim });
+      const rawData = payRes?.data !== undefined ? payRes.data : payRes;
+      const payList = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = payRes?.total ?? rawData?.total ?? payList.length;
+      setPayments(payList);
+      setPayPagination({ page: p, limit: lim, total: totalCount });
+    } catch (err) {
+      console.warn('fetchPayments error:', err);
+    }
+  };
+
+  const fetchJournalEntries = async (p = 1, lim = 10) => {
+    try {
+      const jeRes = await accountingApi.getJournalEntries({ page: p, limit: lim });
+      const rawData = jeRes?.data !== undefined ? jeRes.data : jeRes;
+      const jeList = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+      const totalCount = jeRes?.total ?? rawData?.total ?? jeList.length;
+      setJournalEntries(jeList);
+      setJePagination({ page: p, limit: lim, total: totalCount });
+    } catch (err) {
+      console.warn('fetchJournalEntries error:', err);
+    }
+  };
+
   // Fetch Accounting Data from Backend
   const fetchAllAccountingData = async () => {
     setLoading(true);
     try {
-      const invRes = await accountingApi.getInvoices();
-      const invData = invRes?.data || invRes;
-      const invList = Array.isArray(invData) ? invData : (Array.isArray(invData?.data) ? invData.data : []);
-      setInvoices(invList);
+      await Promise.allSettled([
+        fetchInvoices(1, 10),
+        fetchPayments(1, 10),
+        fetchJournalEntries(1, 10),
+      ]);
 
-      const payRes = await accountingApi.getPayments();
-      const payData = payRes?.data || payRes;
-      const payList = Array.isArray(payData) ? payData : (Array.isArray(payData?.data) ? payData.data : []);
-      setPayments(payList);
-
-      const accRes = await accountingApi.getAccounts();
+      const accRes = await accountingApi.getAccounts().catch(() => null);
       const accData = accRes?.data || accRes;
       const accList = Array.isArray(accData) ? accData : (Array.isArray(accData?.data) ? accData.data : []);
       setAccounts(accList);
-
-      const jeRes = await accountingApi.getJournalEntries();
-      const jeData = jeRes?.data || jeRes;
-      const jeList = Array.isArray(jeData) ? jeData : (Array.isArray(jeData?.data) ? jeData.data : []);
-      setJournalEntries(jeList);
 
       // Fetch Financial Reports
       const pnlRes = await accountingApi.getProfitAndLossReport().catch(() => null);
@@ -525,7 +559,15 @@ const AccountingPage = () => {
                   dataSource={invoices}
                   rowKey="id"
                   loading={loading}
-                  pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+                  pagination={{
+                    current: invPagination.page,
+                    pageSize: invPagination.limit,
+                    total: invPagination.total,
+                    onChange: (p, l) => fetchInvoices(p, l),
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
+                  }}
                   className="overflow-x-auto"
                 />
               ),
@@ -544,7 +586,15 @@ const AccountingPage = () => {
                   dataSource={payments}
                   rowKey="id"
                   loading={loading}
-                  pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+                  pagination={{
+                    current: payPagination.page,
+                    pageSize: payPagination.limit,
+                    total: payPagination.total,
+                    onChange: (p, l) => fetchPayments(p, l),
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
+                  }}
                   className="overflow-x-auto"
                 />
               ),
@@ -563,7 +613,15 @@ const AccountingPage = () => {
                   dataSource={journalEntries}
                   rowKey="id"
                   loading={loading}
-                  pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+                  pagination={{
+                    current: jePagination.page,
+                    pageSize: jePagination.limit,
+                    total: jePagination.total,
+                    onChange: (p, l) => fetchJournalEntries(p, l),
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showSizeChanger: true,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} / ${t('common.total')} ${total}`,
+                  }}
                   className="overflow-x-auto"
                 />
               ),

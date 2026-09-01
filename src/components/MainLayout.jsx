@@ -26,7 +26,8 @@ import {
   ShoppingOutlined,
   ShoppingCartOutlined,
   InboxOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  HistoryOutlined
 } from '@ant-design/icons';
 import { useAuth, getRoleCode } from '../context/AuthContext';
 
@@ -198,6 +199,12 @@ const MainLayout = ({ children }) => {
             roles: ['SUPERADMIN'],
           },
           {
+            key: '/dashboard/audit-logs',
+            icon: <HistoryOutlined />,
+            label: 'Nhật Ký Audit Logs',
+            roles: ['USER'],
+          },
+          {
             key: '/dashboard/profile',
             icon: <UserOutlined />,
             label: t('menu.profile'),
@@ -256,7 +263,7 @@ const MainLayout = ({ children }) => {
       {
         key: 'language',
         icon: <GlobalOutlined />,
-        label: `${i18n.language?.startsWith('en') ? '🇬🇧 English' : '🇻🇳 Tiếng Việt'} (Settings)`,
+        label: `${i18n.language?.startsWith('en') ? 'English' : 'Tiếng Việt'} (Settings)`,
         onClick: () => navigate('/dashboard/profile'),
       },
       ...(isSuperAdmin
